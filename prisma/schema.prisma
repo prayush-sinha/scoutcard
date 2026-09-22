@@ -79,7 +79,7 @@ model Team {
   id                   String          @id @default(uuid()) @db.Uuid
   captainId            String          @map("captain_id") @db.Uuid
   name                 String          @unique
-  division             PremierDivision
+  division             PremierDivision?
   recruitingRoles      String[]        @map("recruiting_roles")   // Duelist, Initiator, etc.
   isActivelyRecruiting Boolean         @default(true) @map("is_actively_recruiting")
   requiredHours        Int[]           @map("required_hours")      // practice schedule 0-167

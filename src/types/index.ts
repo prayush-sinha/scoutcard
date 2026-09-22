@@ -101,6 +101,14 @@ export interface ScoutCardInput {
   isPublished?: boolean;
 }
 
+export interface TeamInput {
+  name?: string;
+  division?: PremierDivision;
+  recruitingRoles?: ValorantRole[];
+  requiredHours?: number[];
+  isActivelyRecruiting?: boolean;
+}
+
 // ─── Pagination ───────────────────────────────────────────────────────────────
 
 export interface PaginationQuery {
