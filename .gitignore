@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment secrets (NEVER COMMIT)
+.env
+.env.*
+!.env.example
+
+# Neon CLI & Project config
+.neon
+.neon/
+.agents/
+
+# Prisma generated client
+# (schema.prisma is tracked, but not the local compiled client)
+# node_modules/.prisma/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+
+# Editor configs
+.vscode/
+.idea/
+
+# Test coverage
+coverage/

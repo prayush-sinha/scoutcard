@@ -1,0 +1,9 @@
+// src/controllers/.gitkeep
+// Controllers will be added here per phase:
+// - auth.controller.ts      (Phase 1.2)
+// - verification.controller.ts (Phase 1.3)
+// - player.controller.ts    (Phase 2.1)
+// - team.controller.ts      (Phase 2.2)
+// - search.controller.ts    (Phase 2.3)
+// - application.controller.ts (Phase 3.1)
+// - notification.controller.ts (Phase 3.3)

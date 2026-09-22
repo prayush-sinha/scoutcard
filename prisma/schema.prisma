@@ -1,0 +1,162 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  ENUMS
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum PremierDivision {
+  Open
+  Intermediate
+  Advanced
+  Elite
+  Contender
+  Invite
+}
+
+enum ApplicationStatus {
+  Applied
+  Reviewed
+  Trialing
+  Accepted
+  Rejected
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  PLAYERS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Player {
+  id              String           @id @default(uuid()) @db.Uuid
+  discordId       String           @unique @map("discord_id")
+  discordToken    String?          @map("discord_token")         // encrypted Discord access token
+  discordUsername String?          @map("discord_username")
+  discordAvatar   String?          @map("discord_avatar")
+  riotId             String?          @map("riot_id")               // e.g. "TenZ#NA1"
+  isVerified         Boolean          @default(false) @map("is_verified")
+  trustScore         Int?             @map("trust_score")           // 0-100 calculated score
+  verificationTier   String?          @map("verification_tier")     // 'verified' | 'unverified'
+  verifiedAt         DateTime?        @map("verified_at")
+  division        PremierDivision?
+  mainAgents      String[]         @map("main_agents")           // max 2 agents
+  flexAgent       String?          @map("flex_agent")
+  playstyleTags   String[]         @map("playstyle_tags")        // max 3 tags
+  vodUrl          String?          @map("vod_url")
+  availableHours  Int[]            @map("available_hours")       // 0-167 indices
+
+  // Scout-card publication flag
+  isPublished     Boolean          @default(false) @map("is_published")
+
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+
+  // Relations
+  captainOf        Team[]          @relation("TeamCaptain")
+  applications     Application[]
+  notifications    Notification[]
+
+  @@map("players")
+  @@index([isVerified], name: "idx_players_is_verified")
+  // GIN index on mainAgents for array containment queries is defined
+  // in the initial SQL migration (Prisma does not yet support GIN directly)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  TEAMS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Team {
+  id                   String          @id @default(uuid()) @db.Uuid
+  captainId            String          @map("captain_id") @db.Uuid
+  name                 String          @unique
+  division             PremierDivision
+  recruitingRoles      String[]        @map("recruiting_roles")   // Duelist, Initiator, etc.
+  isActivelyRecruiting Boolean         @default(true) @map("is_actively_recruiting")
+  requiredHours        Int[]           @map("required_hours")      // practice schedule 0-167
+
+  createdAt            DateTime        @default(now()) @map("created_at")
+  updatedAt            DateTime        @updatedAt @map("updated_at")
+
+  // Relations
+  captain              Player          @relation("TeamCaptain", fields: [captainId], references: [id], onDelete: Cascade)
+  applications         Application[]
+
+  @@map("teams")
+  @@index([captainId], name: "idx_teams_captain_id")
+  @@index([isActivelyRecruiting], name: "idx_teams_is_recruiting")
+  @@index([division], name: "idx_teams_division")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  APPLICATIONS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Application {
+  id            String            @id @default(uuid()) @db.Uuid
+  playerId      String            @map("player_id") @db.Uuid
+  teamId        String            @map("team_id") @db.Uuid
+  status        ApplicationStatus @default(Applied)
+  message       String?           @db.VarChar(500)   // player cover letter
+  captainNotes  String?           @map("captain_notes")
+  notesUpdatedAt DateTime?        @map("notes_updated_at")
+
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
+
+  // Relations
+  player        Player            @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  team          Team              @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  statusHistory ApplicationStatusHistory[]
+
+  @@unique([playerId, teamId], name: "uq_application_player_team")
+  @@map("applications")
+  @@index([status], name: "idx_applications_status")
+  @@index([teamId], name: "idx_applications_team_id")
+  @@index([playerId], name: "idx_applications_player_id")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  APPLICATION STATUS HISTORY  (audit trail)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model ApplicationStatusHistory {
+  id            String            @id @default(uuid()) @db.Uuid
+  applicationId String            @map("application_id") @db.Uuid
+  fromStatus    ApplicationStatus? @map("from_status")
+  toStatus      ApplicationStatus @map("to_status")
+  changedBy     String?           @map("changed_by") @db.Uuid  // player UUID who made the change
+  note          String?
+  changedAt     DateTime          @default(now()) @map("changed_at")
+
+  application   Application       @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@map("application_status_history")
+  @@index([applicationId], name: "idx_status_history_application_id")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  NOTIFICATIONS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Notification {
+  id          String   @id @default(uuid()) @db.Uuid
+  playerId    String   @map("player_id") @db.Uuid
+  type        String                             // e.g. "application:created"
+  payload     Json                               // flexible JSON payload
+  isRead      Boolean  @default(false) @map("is_read")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  player      Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+  @@index([playerId, isRead], name: "idx_notifications_player_unread")
+}
