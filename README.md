@@ -116,9 +116,9 @@ players ──── applications ──── teams
 | Phase | Status |
 |---|---|
 | **1.1 Project Setup & DB Schema** | ✅ Complete |
-| 1.2 Discord OAuth | 🔲 Pending |
-| 1.3 Verification PIN | 🔲 Pending |
-| 2.1 Scout Card Form | 🔲 Pending |
+| **1.2 Discord OAuth Authentication** | ✅ Complete |
+| **1.3 Riot ID & Trust Score Verification** | ✅ Complete |
+| 2.1 Scout Card Form | 🔲 In Progress / Next |
 | 2.2 Team Dashboard | 🔲 Pending |
 | 2.3 Player Search | 🔲 Pending |
 | 3.1 Application System | 🔲 Pending |
