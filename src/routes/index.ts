@@ -4,6 +4,7 @@
 import { Router } from 'express';
 import authRoutes from './auth';
 import verificationRoutes from './verification';
+import playerRoutes from './players';
 
 const router = Router();
 
@@ -24,6 +25,9 @@ router.use('/auth', authRoutes);
 
 // ── Phase 1.3: Verification ───────────────────────────────────────────────────
 router.use('/verification', verificationRoutes);
+
+// ── Phase 2.1: Scout Card / Player Onboarding ─────────────────────────────────
+router.use('/players', playerRoutes);
 
 // ── Future routes (uncommented as each phase is built) ────────────────────────
 // import verificationRoutes from './verification';   // Phase 1.3

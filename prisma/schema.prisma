@@ -21,6 +21,7 @@ enum PremierDivision {
   Elite
   Contender
   Invite
+  EsportsOrg   // Tier-2/3, VCL, Challengers, Collegiate & contracted orgs
 }
 
 enum ApplicationStatus {
