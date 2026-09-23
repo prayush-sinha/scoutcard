@@ -35,15 +35,9 @@ router.use('/players', playerRoutes);
 router.use('/teams', teamRoutes);
 
 // ── Future routes (uncommented as each phase is built) ────────────────────────
-// import verificationRoutes from './verification';   // Phase 1.3
-// import playerRoutes from './players';              // Phase 2.1
-// import teamRoutes from './teams';                  // Phase 2.2
 // import applicationRoutes from './applications';    // Phase 3.1
 // import notificationRoutes from './notifications';  // Phase 3.3
 
-// router.use('/verification', verificationRoutes);
-// router.use('/players', playerRoutes);
-// router.use('/teams', teamRoutes);
 // router.use('/applications', applicationRoutes);
 // router.use('/notifications', notificationRoutes);
 

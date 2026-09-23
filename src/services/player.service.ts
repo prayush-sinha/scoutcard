@@ -8,7 +8,13 @@ import {
   PREMIER_DIVISIONS,
   PLAYSTYLE_TAGS,
   PremierDivision,
+  VALORANT_AGENTS,
+  ValidationError,
+  PlayerSearchQuery,
+  PlayerSearchResult,
 } from '../types';
+import { scheduleOverlapCount, calculateOverlapWithSet } from '../utils/availability';
+import { isValidUuid } from '../utils/validation';
 
 // ─── VOD URL validation ───────────────────────────────────────────────────────
 
@@ -35,10 +41,8 @@ export function isValidAvailabilityHours(hours: unknown): hours is number[] {
 
 // ─── Scout card validation ────────────────────────────────────────────────────
 
-export interface ValidationError {
-  field: string;
-  message: string;
-}
+// ValidationError is imported from '../types' — the canonical shared definition.
+export type { ValidationError };
 
 /**
  * Full validation for publishing a Scout Card.
@@ -62,24 +66,42 @@ export function validateScoutCard(
     errors.push({ field: 'division', message: 'Premier division is required to publish.' });
   }
 
-  // Main agents — exactly 2 required to publish
+  // Main agents — exactly 2 required to publish, must be valid Valorant agents
   if (input.mainAgents !== undefined) {
     if (!Array.isArray(input.mainAgents) || input.mainAgents.length !== 2) {
       errors.push({ field: 'mainAgents', message: 'Exactly 2 main agents are required.' });
-    }
-    if (input.flexAgent && input.mainAgents?.includes(input.flexAgent)) {
-      errors.push({ field: 'flexAgent', message: 'Flex agent cannot be the same as a main agent.' });
+    } else {
+      const invalidAgents = input.mainAgents.filter(
+        (a) => !(VALORANT_AGENTS as readonly string[]).includes(a)
+      );
+      if (invalidAgents.length > 0) {
+        errors.push({
+          field: 'mainAgents',
+          message: `Invalid agent(s): ${invalidAgents.join(', ')}. Must be valid Valorant agents.`,
+        });
+      }
     }
   } else if (mode === 'publish') {
     errors.push({ field: 'mainAgents', message: 'Exactly 2 main agents are required to publish.' });
   }
 
-  // Flex agent — required to publish
-  if (mode === 'publish' && !input.flexAgent) {
+  // Flex agent — required to publish, must be a valid Valorant agent, and cannot duplicate a main agent
+  if (input.flexAgent !== undefined && input.flexAgent !== null) {
+    if (!(VALORANT_AGENTS as readonly string[]).includes(input.flexAgent)) {
+      errors.push({
+        field: 'flexAgent',
+        message: `Invalid agent: ${input.flexAgent}. Must be a valid Valorant agent.`,
+      });
+    }
+    if (input.mainAgents?.includes(input.flexAgent)) {
+      errors.push({ field: 'flexAgent', message: 'Flex agent cannot be the same as a main agent.' });
+    }
+  } else if (mode === 'publish') {
     errors.push({ field: 'flexAgent', message: 'A flex agent is required to publish.' });
   }
 
-  // Playstyle tags — max 2, from allowed set
+  // Playstyle tags — max 2 per player, from allowed set.
+  // At least 1 is required to publish so teams know how you play.
   if (input.playstyleTags !== undefined) {
     if (input.playstyleTags.length > 2) {
       errors.push({ field: 'playstyleTags', message: 'Maximum 2 playstyle tags allowed.' });
@@ -93,6 +115,14 @@ export function validateScoutCard(
         message: `Invalid tags: ${invalidTags.join(', ')}. Allowed: ${PLAYSTYLE_TAGS.join(', ')}`,
       });
     }
+  }
+
+  // Require at least 1 tag to publish (enforced separately so it appears even if field is omitted)
+  if (mode === 'publish' && (!input.playstyleTags || input.playstyleTags.length === 0)) {
+    errors.push({
+      field: 'playstyleTags',
+      message: 'At least 1 playstyle tag (IGL | Entry | Lurk | Support | Anchor) is required to publish.',
+    });
   }
 
   // VOD URL
@@ -163,6 +193,7 @@ export async function saveDraft(playerId: string, input: ScoutCardInput) {
       ...(input.mainAgents !== undefined && { mainAgents: input.mainAgents }),
       ...(input.flexAgent !== undefined && { flexAgent: input.flexAgent }),
       ...(input.playstyleTags !== undefined && { playstyleTags: input.playstyleTags }),
+      // vodUrl: undefined → skip update; null → explicitly clear the field
       ...(input.vodUrl !== undefined && { vodUrl: input.vodUrl }),
       ...(input.availableHours !== undefined && { availableHours: input.availableHours }),
       // Never flip isPublished in a draft save
@@ -227,4 +258,200 @@ export function calculateCompletionScore(player: {
   if (player.vodUrl) score += 10;                          // VOD link uploaded
   if (player.availableHours.length > 0) score += 10;       // Availability set
   return Math.min(100, score);
+}
+
+// ─── Phase 2.3: Player Search ─────────────────────────────────────────────────
+
+/** Shared Prisma select for public Scout Card fields */
+const publicCardSelect = {
+  id: true,
+  discordUsername: true,
+  discordAvatar: true,
+  riotId: true,
+  isVerified: true,
+  trustScore: true,
+  verificationTier: true,
+  division: true,
+  mainAgents: true,
+  flexAgent: true,
+  playstyleTags: true,
+  vodUrl: true,
+  availableHours: true,
+  updatedAt: true,
+} as const;
+
+/**
+ * Search published Scout Cards.
+ * Applies GIN-backed filters (division, agents, tags, verified) in Postgres,
+ * then handles overlap sorting in-application after fetching.
+ *
+ * Returns { data: PlayerSearchResult[], total: number } for the paginated response.
+ */
+export async function searchPlayers(query: PlayerSearchQuery): Promise<{
+  data: PlayerSearchResult[];
+  total: number;
+}> {
+  const page  = Math.max(1, parseInt(query.page  ?? '1',  10) || 1);
+  const limit = Math.min(50, Math.max(1, parseInt(query.limit ?? '20', 10) || 20));
+  const skip  = (page - 1) * limit;
+
+  // ── Parse filter params ────────────────────────────────────────────────────
+  const agentList = query.agents
+    ? query.agents.split(',').map((a) => a.trim()).filter(Boolean)
+    : [];
+
+  const tagList = query.tags
+    ? query.tags.split(',').map((t) => t.trim()).filter(Boolean)
+    : [];
+
+  const verifiedOnly = query.verified === 'true';
+
+  const validDivision = query.division && PREMIER_DIVISIONS.includes(query.division as PremierDivision)
+    ? (query.division as PremierDivision)
+    : undefined;
+
+  // ── Build Prisma where clause ──────────────────────────────────────────────
+  const where = {
+    isPublished: true,
+    ...(validDivision     && { division: validDivision }),
+    ...(verifiedOnly      && { isVerified: true }),
+    // GIN `&&` (hasSome) — player mains at least one of the specified agents
+    ...(agentList.length > 0 && { mainAgents: { hasSome: agentList } }),
+    // GIN `&&` (hasSome) — player has at least one of the specified tags
+    ...(tagList.length > 0   && { playstyleTags: { hasSome: tagList } }),
+  };
+
+  // ── Sort mode ──────────────────────────────────────────────────────────────
+  const sort = query.sort ?? 'recent';
+
+  // For overlap sort we fetch all matches (no skip/take in Postgres) then sort
+  // in memory, because Postgres can't ORDER BY a computed set-intersection.
+  // The GIN filters keep the candidate set small so this is safe.
+  const useOverlapSort = sort === 'overlap';
+
+  let orderBy: object | undefined;
+  if (sort === 'trust') {
+    orderBy = { trustScore: 'desc' as const };
+  } else if (!useOverlapSort) {
+    orderBy = { updatedAt: 'desc' as const };
+  }
+
+  // ── Fetch team's requiredHours if teamId supplied ─────────────────────────
+  let teamRequiredHours: number[] = [];
+  if (query.teamId && isValidUuid(query.teamId)) {
+    const team = await prisma.team.findUnique({
+      where: { id: query.teamId },
+      select: { requiredHours: true },
+    });
+    teamRequiredHours = team?.requiredHours ?? [];
+  }
+
+  // ── Query ─────────────────────────────────────────────────────────────────
+  if (useOverlapSort) {
+    // Stage 1: Fetch only id & availableHours for candidates (drastically reduces DB egress)
+    const candidates = await prisma.player.findMany({
+      where,
+      select: { id: true, availableHours: true },
+    });
+
+    const requiredSet = new Set(teamRequiredHours);
+    const scored = candidates.map((c) => ({
+      id: c.id,
+      overlap: calculateOverlapWithSet(c.availableHours, requiredSet),
+    }));
+
+    scored.sort((a, b) => b.overlap - a.overlap);
+
+    const total = scored.length;
+    const pageSlice = scored.slice(skip, skip + limit);
+
+    if (pageSlice.length === 0) {
+      return { data: [], total };
+    }
+
+    // Stage 2: Fetch full card details only for the current page
+    const pageIds = pageSlice.map((s) => s.id);
+    const fullCards = await prisma.player.findMany({
+      where: { id: { in: pageIds } },
+      select: publicCardSelect,
+    });
+
+    const cardMap = new Map(fullCards.map((card) => [card.id, card]));
+    const data: PlayerSearchResult[] = pageSlice.map((s) => {
+      const card = cardMap.get(s.id)!;
+      return {
+        ...card,
+        division: card.division as string | null,
+        scheduleOverlap: s.overlap,
+      };
+    });
+
+    return { data, total };
+  }
+
+  // ── Standard paginated fetch (recent or trust sort) ───────────────────────
+  const [rows, total] = await Promise.all([
+    prisma.player.findMany({
+      where,
+      select: publicCardSelect,
+      orderBy,
+      skip,
+      take: limit,
+    }),
+    prisma.player.count({ where }),
+  ]);
+
+  const requiredSet =
+    query.teamId && teamRequiredHours.length > 0 ? new Set(teamRequiredHours) : null;
+
+  const data: PlayerSearchResult[] = rows.map((p) => ({
+    ...p,
+    division: p.division as string | null,
+    // Attach overlap count whenever a teamId was provided, even for non-overlap sorts
+    ...(query.teamId && {
+      scheduleOverlap: requiredSet
+        ? calculateOverlapWithSet(p.availableHours, requiredSet)
+        : 0,
+    }),
+  }));
+
+  return { data, total };
+}
+
+/**
+ * Fetch a single published player's public Scout Card.
+ * Returns null if the player doesn't exist or hasn't published their card.
+ * Optionally attaches scheduleOverlap if the viewer's teamId is provided.
+ */
+export async function getPlayerById(
+  playerId: string,
+  viewerTeamId?: string
+): Promise<PlayerSearchResult | null> {
+  if (!isValidUuid(playerId)) return null;
+
+  const player = await prisma.player.findUnique({
+    where: { id: playerId },
+    select: { ...publicCardSelect, isPublished: true },
+  });
+
+  if (!player || !player.isPublished) return null;
+
+  let scheduleOverlap: number | undefined;
+  if (viewerTeamId && isValidUuid(viewerTeamId)) {
+    const team = await prisma.team.findUnique({
+      where: { id: viewerTeamId },
+      select: { requiredHours: true },
+    });
+    if (team) {
+      scheduleOverlap = scheduleOverlapCount(player.availableHours, team.requiredHours);
+    }
+  }
+
+  const { isPublished: _pub, ...publicFields } = player;
+
+  return {
+    ...publicFields,
+    division: publicFields.division as string | null,
+    ...(scheduleOverlap !== undefined && { scheduleOverlap }),
+  };
 }

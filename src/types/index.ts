@@ -34,6 +34,14 @@ export interface ApiError {
 
 export type ApiResponse<T = unknown> = ApiSuccess<T> | ApiError;
 
+// ─── Shared validation types ──────────────────────────────────────────────────
+
+/** Represents a single field-level validation failure. */
+export interface ValidationError {
+  field: string;
+  message: string;
+}
+
 // ─── Valorant domain types ───────────────────────────────────────────────────
 
 export type PremierDivision =
@@ -121,4 +129,44 @@ export interface PaginationMeta {
   limit: number;
   total: number;
   totalPages: number;
+}
+
+// ─── Phase 2.3: Player Search ─────────────────────────────────────────────────
+
+/** Validated query-string shape for GET /api/v1/players/search */
+export interface PlayerSearchQuery {
+  /** Filter to an exact Premier division */
+  division?: string;
+  /** Comma-separated agent names — player must main at least one (`&&` GIN overlap) */
+  agents?: string;
+  /** Comma-separated playstyle tags — player must have at least one (`&&` GIN overlap) */
+  tags?: string;
+  /** If "true", only return verified players */
+  verified?: string;
+  /** UUID of the requesting team — enables scheduleOverlap field and required for `sort=overlap` */
+  teamId?: string;
+  /** "recent" (default) | "trust" | "overlap" */
+  sort?: string;
+  page?: string;
+  limit?: string;
+}
+
+/** Public-facing shape of a single Scout Card in search results */
+export interface PlayerSearchResult {
+  id: string;
+  discordUsername: string | null;
+  discordAvatar: string | null;
+  riotId: string | null;
+  isVerified: boolean;
+  trustScore: number | null;
+  verificationTier: string | null;
+  division: string | null;
+  mainAgents: string[];
+  flexAgent: string | null;
+  playstyleTags: string[];
+  vodUrl: string | null;
+  availableHours: number[];
+  updatedAt: Date;
+  /** Only present when teamId is supplied — how many of the team's required hours this player covers */
+  scheduleOverlap?: number;
 }

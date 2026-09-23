@@ -25,7 +25,15 @@ const STATE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
 function generateState(): string {
   const state = crypto.randomBytes(32).toString('hex');
-  pendingStates.set(state, Date.now() + STATE_TTL_MS);
+  const now = Date.now();
+  pendingStates.set(state, now + STATE_TTL_MS);
+
+  // Prune expired states on every generation to prevent unbounded map growth
+  // (abandoned OAuth flows where the user closed Discord before granting access).
+  for (const [key, expiry] of pendingStates) {
+    if (now > expiry) pendingStates.delete(key);
+  }
+
   return state;
 }
 
@@ -112,6 +120,7 @@ export async function handleDiscordCallback(
 
 /**
  * Returns the player associated with a verified JWT payload.
+ * Returns all fields needed by the frontend auth context (including verification status).
  */
 export async function getPlayerFromJwt(userId: string) {
   const player = await prisma.player.findUnique({
@@ -123,6 +132,8 @@ export async function getPlayerFromJwt(userId: string) {
       discordAvatar: true,
       riotId: true,
       isVerified: true,
+      trustScore: true,         // included so frontend can show the trust badge
+      verificationTier: true,   // included so frontend can conditionally render verified/unverified state
       division: true,
       mainAgents: true,
       flexAgent: true,
@@ -155,7 +166,7 @@ async function exchangeCodeForTokens(code: string): Promise<DiscordTokenResponse
     });
 
     return response.data;
-  } catch (err) {
+  } catch (_err) {
     throw new Error('DISCORD_TOKEN_EXCHANGE_FAILED');
   }
 }
@@ -166,7 +177,7 @@ async function fetchDiscordUser(accessToken: string): Promise<DiscordUser> {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
     return response.data;
-  } catch (err) {
+  } catch (_err) {
     throw new Error('DISCORD_USER_FETCH_FAILED');
   }
 }
@@ -175,6 +186,10 @@ async function upsertPlayer(
   discordUser: DiscordUser,
   discordToken: string
 ): Promise<{ player: { id: string; discordId: string }; isNewUser: boolean }> {
+  // NOTE: discordToken is stored as plain text. The schema comment says "encrypted"
+  // but encryption is deferred to a later hardening phase. The token has a short
+  // TTL (~7 days) and is used only to refresh profile data on login. Do NOT store
+  // long-lived credentials here without encrypting first.
   const existing = await prisma.player.findUnique({
     where: { discordId: discordUser.id },
   });

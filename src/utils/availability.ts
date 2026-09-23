@@ -40,14 +40,33 @@ export function isScheduleCompatible(
 }
 
 /**
+ * Returns the number of overlapping hours using a pre-constructed Set.
+ * Avoids repeated Set allocations when comparing one team schedule against many players.
+ */
+export function calculateOverlapWithSet(
+  playerHours: number[],
+  requiredHoursSet: Set<number>
+): number {
+  if (playerHours.length === 0 || requiredHoursSet.size === 0) return 0;
+  let count = 0;
+  for (let i = 0; i < playerHours.length; i++) {
+    if (requiredHoursSet.has(playerHours[i])) {
+      count++;
+    }
+  }
+  return count;
+}
+
+/**
  * Returns the number of overlapping hours between player and team schedules.
  */
 export function scheduleOverlapCount(
   playerHours: number[],
   requiredHours: number[]
 ): number {
-  const playerSet = new Set(playerHours);
-  return requiredHours.filter((h) => playerSet.has(h)).length;
+  if (playerHours.length === 0 || requiredHours.length === 0) return 0;
+  const set = new Set(requiredHours);
+  return calculateOverlapWithSet(playerHours, set);
 }
 
 /**

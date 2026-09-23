@@ -42,14 +42,12 @@ export async function verifyRiot(
 
     const result = await verifyPlayer(playerId, trimmedRiotId);
 
-    const statusCode = result.verified ? 200 : 200; // Always 200 — unverified is still a valid result
     sendSuccess(
       res,
       result,
       result.verified
         ? `✅ Verified! Trust score: ${result.trustScore}/100`
-        : `⚠️ Not verified. Trust score: ${result.trustScore}/100 — ${result.reason}`,
-      statusCode
+        : `⚠️ Not verified. Trust score: ${result.trustScore}/100 — ${result.reason}`
     );
   } catch (err) {
     const message = (err as Error).message;

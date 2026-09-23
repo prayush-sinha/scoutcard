@@ -38,6 +38,16 @@ export async function discordCallback(
   next: NextFunction
 ): Promise<void> {
   try {
+    // Guard: callback shouldn't be reachable if Discord OAuth isn't configured,
+    // but protect against direct hits to the URL without credentials set up.
+    if (!env.DISCORD_CLIENT_ID || !env.DISCORD_CLIENT_SECRET) {
+      res.status(503).json({
+        success: false,
+        error: 'Discord OAuth is not configured. Set DISCORD_CLIENT_ID and DISCORD_CLIENT_SECRET in .env',
+      });
+      return;
+    }
+
     const { code, state, error, error_description } = req.query as Record<string, string>;
 
     // User denied authorization on Discord's side
@@ -108,6 +118,6 @@ export async function getMe(req: AuthRequest, res: Response, next: NextFunction)
  */
 export async function logout(_req: Request, res: Response): Promise<void> {
   // Clear cookie if you're using one
-  res.clearCookie('token');
+  res.clearCookie('token', { path: '/' });
   sendSuccess(res, null, 'Logged out successfully.');
 }

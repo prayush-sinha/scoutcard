@@ -11,6 +11,7 @@ import {
 } from '../services/team.service';
 import { AuthRequest, TeamInput } from '../types';
 import { sendSuccess, sendError } from '../utils/response';
+import { isValidUuid } from '../utils/validation';
 
 /**
  * POST /api/v1/teams
@@ -76,6 +77,12 @@ export async function getTeamHandler(
 ): Promise<void> {
   try {
     const id = req.params.id as string;
+
+    if (!isValidUuid(id)) {
+      sendError(res, 'Team not found.', 404);
+      return;
+    }
+
     const team = await getTeamById(id);
 
     if (!team) {
@@ -103,6 +110,12 @@ export async function updateTeamHandler(
   try {
     const captainId = req.user!.userId;
     const id = req.params.id as string;
+
+    if (!isValidUuid(id)) {
+      sendError(res, 'Team not found.', 404);
+      return;
+    }
+
     const input = req.body as TeamInput;
 
     const result = await updateTeam(id, captainId, input);
@@ -132,6 +145,11 @@ export async function disbandTeamHandler(
   try {
     const captainId = req.user!.userId;
     const id = req.params.id as string;
+
+    if (!isValidUuid(id)) {
+      sendError(res, 'Team not found.', 404);
+      return;
+    }
 
     const result = await disbandTeam(id, captainId);
 

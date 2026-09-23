@@ -17,6 +17,6 @@ module.exports = {
   ],
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov'],
-  setupFilesAfterFramework: [],
+  setupFilesAfterEnv: [],
   verbose: true,
 };

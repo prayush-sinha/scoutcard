@@ -9,12 +9,9 @@ import {
   updateTeamHandler,
   disbandTeamHandler,
 } from '../controllers/team.controller';
-import { verifyToken } from '../middleware/auth';
+import { verifyToken, optionalToken } from '../middleware/auth';
 
 const router = Router();
-
-// All team routes require authentication
-router.use(verifyToken);
 
 /**
  * POST /api/v1/teams
@@ -29,7 +26,7 @@ router.use(verifyToken);
  *   isActivelyRecruiting?: boolean     // defaults to true
  * }
  */
-router.post('/', createTeamHandler);
+router.post('/', verifyToken, createTeamHandler);
 
 /**
  * GET /api/v1/teams/my-team
@@ -39,13 +36,14 @@ router.post('/', createTeamHandler);
  * IMPORTANT: this route must come BEFORE /:id so Express doesn't
  * interpret "my-team" as a team ID.
  */
-router.get('/my-team', getMyTeamHandler);
+router.get('/my-team', verifyToken, getMyTeamHandler);
 
 /**
  * GET /api/v1/teams/:id
- * Public team profile — players can browse a team before deciding to apply.
+ * Public team profile — players and anonymous visitors can browse a team before deciding to apply.
+ * optionalToken: sets req.user if a token is present, but does NOT reject unauthenticated requests.
  */
-router.get('/:id', getTeamHandler);
+router.get('/:id', optionalToken, getTeamHandler);
 
 /**
  * PUT /api/v1/teams/:id
@@ -55,13 +53,13 @@ router.get('/:id', getTeamHandler);
  *   name, division, recruitingRoles, requiredHours, isActivelyRecruiting
  * }>
  */
-router.put('/:id', updateTeamHandler);
+router.put('/:id', verifyToken, updateTeamHandler);
 
 /**
  * DELETE /api/v1/teams/:id
  * Disband the team. Captain-only.
  * Cascade deletes all applications and status history records.
  */
-router.delete('/:id', disbandTeamHandler);
+router.delete('/:id', verifyToken, disbandTeamHandler);
 
 export default router;

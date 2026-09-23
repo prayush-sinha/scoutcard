@@ -2,23 +2,11 @@
 // Team creation, retrieval, update, and disbanding logic for Phase 2.2.
 
 import prisma from '../lib/prisma';
-import { PremierDivision, ValorantRole, PREMIER_DIVISIONS } from '../types';
+import { ValorantRole, PREMIER_DIVISIONS, TeamInput, ValidationError } from '../types';
 import { isValidAvailabilityHours } from './player.service';
+import { isValidUuid } from '../utils/validation';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-export interface TeamInput {
-  name?: string;
-  division?: PremierDivision;
-  recruitingRoles?: ValorantRole[];
-  requiredHours?: number[];
-  isActivelyRecruiting?: boolean;
-}
-
-export interface ValidationError {
-  field: string;
-  message: string;
-}
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const VALID_ROLES: ValorantRole[] = [
   'Duelist', 'Initiator', 'Controller', 'Sentinel', 'Flex',
@@ -92,6 +80,13 @@ export async function createTeam(
   captainId: string,
   input: TeamInput
 ): Promise<{ success: true; data: object } | { success: false; errors: ValidationError[] }> {
+  if (!isValidUuid(captainId)) {
+    return {
+      success: false,
+      errors: [{ field: 'captainId', message: 'Invalid captain ID format.' }],
+    };
+  }
+
   const errors = validateTeamInput(input, 'create');
   if (errors.length > 0) return { success: false, errors };
 
@@ -131,9 +126,11 @@ export async function createTeam(
 }
 
 /**
- * Fetches the captain's team along with full application stats per status.
+ * Fetches the captain's team along with full application stats per status and accepted roster.
  */
 export async function getMyTeam(captainId: string) {
+  if (!isValidUuid(captainId)) return null;
+
   const team = await prisma.team.findFirst({
     where: { captainId },
     select: {
@@ -145,35 +142,46 @@ export async function getMyTeam(captainId: string) {
           discordAvatar: true,
           riotId: true,
           isVerified: true,
+          trustScore: true,
         },
       },
       applications: {
-        select: { status: true },
+        select: {
+          status: true,
+          player: { select: rosterMemberSelect },
+        },
       },
     },
   });
 
   if (!team) return null;
 
-  // Aggregate application counts per status
+  // Aggregate application counts per status and collect accepted roster members
   const { applications, ...teamData } = team;
+  const acceptedRoster = applications
+    .filter((a) => a.status === 'Accepted')
+    .map((a) => a.player);
+
   const stats = {
     total: applications.length,
     applied: applications.filter((a) => a.status === 'Applied').length,
     reviewed: applications.filter((a) => a.status === 'Reviewed').length,
     trialing: applications.filter((a) => a.status === 'Trialing').length,
-    accepted: applications.filter((a) => a.status === 'Accepted').length,
+    accepted: acceptedRoster.length,
     rejected: applications.filter((a) => a.status === 'Rejected').length,
   };
 
-  return { ...teamData, applicationStats: stats };
+  return { ...teamData, roster: acceptedRoster, applicationStats: stats };
 }
 
 /**
  * Fetches any team by ID (public view — used by players browsing teams).
+ * Includes the captain and accepted roster members.
  */
 export async function getTeamById(teamId: string) {
-  return prisma.team.findUnique({
+  if (!isValidUuid(teamId)) return null;
+
+  const team = await prisma.team.findUnique({
     where: { id: teamId },
     select: {
       ...teamSelectFields,
@@ -187,8 +195,21 @@ export async function getTeamById(teamId: string) {
           trustScore: true,
         },
       },
+      applications: {
+        where: { status: 'Accepted' },
+        select: {
+          player: { select: rosterMemberSelect },
+        },
+      },
     },
   });
+
+  if (!team) return null;
+
+  const { applications, ...teamData } = team;
+  const roster = applications.map((a) => a.player);
+
+  return { ...teamData, roster };
 }
 
 /**
@@ -199,6 +220,14 @@ export async function updateTeam(
   captainId: string,
   input: TeamInput
 ): Promise<{ success: true; data: object } | { success: false; errors: ValidationError[]; status?: number }> {
+  if (!isValidUuid(teamId) || !isValidUuid(captainId)) {
+    return {
+      success: false,
+      errors: [{ field: 'id', message: 'Invalid team or captain ID format.' }],
+      status: 400,
+    };
+  }
+
   const errors = validateTeamInput(input, 'update');
   if (errors.length > 0) return { success: false, errors };
 
@@ -243,6 +272,10 @@ export async function disbandTeam(
   teamId: string,
   captainId: string
 ): Promise<{ success: true } | { success: false; error: string; status: number }> {
+  if (!isValidUuid(teamId) || !isValidUuid(captainId)) {
+    return { success: false, error: 'Invalid team or captain ID format.', status: 400 };
+  }
+
   const team = await prisma.team.findUnique({ where: { id: teamId } });
   if (!team) return { success: false, error: 'Team not found.', status: 404 };
   if (team.captainId !== captainId) {
@@ -254,6 +287,18 @@ export async function disbandTeam(
 }
 
 // ─── Shared select fields ─────────────────────────────────────────────────────
+
+const rosterMemberSelect = {
+  id: true,
+  discordUsername: true,
+  discordAvatar: true,
+  riotId: true,
+  isVerified: true,
+  trustScore: true,
+  division: true,
+  mainAgents: true,
+  playstyleTags: true,
+} as const;
 
 const teamSelectFields = {
   id: true,

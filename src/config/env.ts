@@ -34,7 +34,7 @@ export const env = {
   DISCORD_CLIENT_SECRET: optionalEnv('DISCORD_CLIENT_SECRET', ''),
   DISCORD_REDIRECT_URI: optionalEnv(
     'DISCORD_REDIRECT_URI',
-    'http://localhost:3001/auth/discord/callback'
+    'http://localhost:3001/api/v1/auth/discord/callback'
   ),
 
   // Tracker.gg

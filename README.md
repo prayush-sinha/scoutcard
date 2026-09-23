@@ -118,9 +118,9 @@ players ──── applications ──── teams
 | **1.1 Project Setup & DB Schema** | ✅ Complete |
 | **1.2 Discord OAuth Authentication** | ✅ Complete |
 | **1.3 Riot ID & Trust Score Verification** | ✅ Complete |
-| 2.1 Scout Card Form | 🔲 In Progress / Next |
-| 2.2 Team Dashboard | 🔲 Pending |
-| 2.3 Player Search | 🔲 Pending |
+| **2.1 Scout Card Form** | ✅ Complete |
+| **2.2 Team Dashboard** | ✅ Complete |
+| **2.3 Player Search** | ✅ Complete |
 | 3.1 Application System | 🔲 Pending |
 | 3.2 Kanban Board | 🔲 Pending |
 | 3.3 Socket.io Real-time | 🔲 Pending |

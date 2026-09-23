@@ -42,7 +42,9 @@ export function verifyToken(req: AuthRequest, res: Response, next: NextFunction)
  */
 export function optionalToken(req: AuthRequest, _res: Response, next: NextFunction): void {
   const authHeader = req.headers.authorization;
-  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
+  const token =
+    (authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined) ??
+    (req.cookies?.token as string | undefined);
 
   if (token) {
     try {

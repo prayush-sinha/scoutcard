@@ -76,15 +76,51 @@ interface TrackerApiResponse {
 
 /**
  * Main verification function.
- * 1. Fetches Tracker.gg data for the given Riot ID
- * 2. Calculates trust score
- * 3. Updates the player record in the database
- * 4. Returns the full trust score result
+ * 1. Checks for a 24-hour re-verification cooldown (returns cached result if within window)
+ * 2. Fetches Tracker.gg data for the given Riot ID
+ * 3. Calculates trust score
+ * 4. Updates the player record in the database
+ * 5. Returns the full trust score result
  */
 export async function verifyPlayer(
   playerId: string,
   riotId: string
 ): Promise<TrustScoreResult> {
+  // ── 24-hour re-verification cooldown ─────────────────────────────────────────
+  // Prevents players from hammering the Tracker API and re-scoring every 5 minutes.
+  const existing = await prisma.player.findUnique({
+    where: { id: playerId },
+    select: { verifiedAt: true, riotId: true, isVerified: true, trustScore: true, verificationTier: true },
+  });
+
+  if (existing?.verifiedAt) {
+    const msSinceVerification = Date.now() - existing.verifiedAt.getTime();
+    const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
+
+    if (msSinceVerification < TWENTY_FOUR_HOURS) {
+      const hoursRemaining = Math.ceil((TWENTY_FOUR_HOURS - msSinceVerification) / (60 * 60 * 1000));
+      const verified = existing.isVerified;
+      const tier = existing.verificationTier as 'verified' | 'unverified' ?? 'unverified';
+      return {
+        verified,
+        tier,
+        badge: verified ? '✅ Verified' : '⚠️ Unverified',
+        trustScore: existing.trustScore ?? 0,
+        breakdown: { matchesScore: 0, activityScore: 0, rankScore: 0, timePlayedScore: 0 },
+        trackerData: null,
+        reason: `Re-verification is on cooldown. You can verify again in ${hoursRemaining} hour${hoursRemaining === 1 ? '' : 's'}.`,
+      };
+    }
+  }
+
+  // ── Warn if API key is not configured ────────────────────────────────────────
+  if (!env.TRACKER_API_KEY) {
+    console.warn(
+      '[verification.service] TRACKER_API_KEY is not set. ' +
+      'Tracker.gg requests will fail with 401. Set TRACKER_API_KEY in .env.'
+    );
+  }
+
   // Parse Riot ID format: "TenZ#NA1" → name="TenZ", tag="NA1"
   const { name, tag } = parseRiotId(riotId);
 
@@ -150,6 +186,8 @@ export async function getVerificationStatus(playerId: string) {
 // ─── Tracker.gg fetcher ───────────────────────────────────────────────────────
 
 async function fetchTrackerData(name: string, tag: string): Promise<TrackerSummary | null> {
+  // encodeURIComponent converts '#' → '%23', which is what Tracker.gg v2 expects.
+  // Do NOT double-encode or split on '/' — the API uses the full encoded handle as one path segment.
   const encodedRiotId = encodeURIComponent(`${name}#${tag}`);
   const url = `${TRACKER_BASE}/${encodedRiotId}`;
 
