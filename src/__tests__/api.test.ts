@@ -2,7 +2,10 @@
 // Integration tests for ScoutCard API endpoints using supertest.
 
 import request from 'supertest';
+import jwt from 'jsonwebtoken';
 import { createApp } from '../app';
+import prisma from '../lib/prisma';
+import { env } from '../config/env';
 
 const app = createApp();
 
@@ -148,6 +151,143 @@ describe('API Integration Tests', () => {
       );
       expect(res.status).toBe(401);
       expect(res.body.success).toBe(false);
+    });
+
+    it('PATCH /api/v1/applications/:id/status returns 401 when unauthenticated', async () => {
+      const res = await request(app)
+        .patch('/api/v1/applications/00000000-0000-0000-0000-000000000000/status')
+        .send({ status: 'Reviewed' });
+      expect(res.status).toBe(401);
+      expect(res.body.success).toBe(false);
+    });
+
+    it('GET /api/v1/applications/:id/history returns 401 when unauthenticated', async () => {
+      const res = await request(app).get(
+        '/api/v1/applications/00000000-0000-0000-0000-000000000000/history'
+      );
+      expect(res.status).toBe(401);
+      expect(res.body.success).toBe(false);
+    });
+
+    describe('PATCH /applications/:id/status', () => {
+      let testAppId: string;
+      let acceptedAppId: string;
+      let teamLeadToken: string;
+      let playerToken: string;
+      const createdAppIds: string[] = [];
+
+      beforeAll(async () => {
+        const team = await prisma.team.findFirst({
+          include: { captain: true },
+        });
+
+        if (team && team.captain) {
+          const applicant = await prisma.player.findFirst({
+            where: { id: { not: team.captainId } },
+          });
+
+          if (applicant) {
+            teamLeadToken = jwt.sign(
+              { userId: team.captainId, discordId: team.captain.discordId },
+              env.JWT_SECRET
+            );
+            playerToken = jwt.sign(
+              { userId: applicant.id, discordId: applicant.discordId },
+              env.JWT_SECRET
+            );
+
+            await prisma.application.deleteMany({
+              where: { playerId: applicant.id, teamId: team.id },
+            });
+
+            const testApp = await prisma.application.create({
+              data: {
+                playerId: applicant.id,
+                teamId: team.id,
+                status: 'Applied',
+                message: 'Test application for status flow',
+              },
+            });
+            testAppId = testApp.id;
+            createdAppIds.push(testApp.id);
+
+            const anotherApplicant = await prisma.player.findFirst({
+              where: { id: { notIn: [team.captainId, applicant.id] } },
+            });
+
+            if (anotherApplicant) {
+              await prisma.application.deleteMany({
+                where: { playerId: anotherApplicant.id, teamId: team.id },
+              });
+
+              const acceptedApp = await prisma.application.create({
+                data: {
+                  playerId: anotherApplicant.id,
+                  teamId: team.id,
+                  status: 'Accepted',
+                  message: 'Already accepted application',
+                },
+              });
+              acceptedAppId = acceptedApp.id;
+              createdAppIds.push(acceptedApp.id);
+            }
+          }
+        }
+      }, 30000);
+
+      afterAll(async () => {
+        if (createdAppIds.length > 0) {
+          await prisma.applicationStatusHistory.deleteMany({
+            where: { applicationId: { in: createdAppIds } },
+          });
+          await prisma.application.deleteMany({
+            where: { id: { in: createdAppIds } },
+          });
+        }
+      }, 30000);
+
+      it('allows Applied → Reviewed by team lead', async () => {
+        const res = await request(app)
+          .patch(`/api/v1/applications/${testAppId}/status`)
+          .set('Authorization', `Bearer ${teamLeadToken}`)
+          .send({ status: 'Reviewed' });
+
+        expect(res.status).toBe(200);
+        expect(res.body.data.status).toBe('Reviewed');
+      });
+
+      it('logs a status_history row on every change', async () => {
+        await request(app)
+          .patch(`/api/v1/applications/${testAppId}/status`)
+          .set('Authorization', `Bearer ${teamLeadToken}`)
+          .send({ status: 'Trialing' });
+
+        const res = await request(app)
+          .get(`/api/v1/applications/${testAppId}/history`)
+          .set('Authorization', `Bearer ${teamLeadToken}`);
+
+        expect(res.status).toBe(200);
+        expect(res.body.data.length).toBeGreaterThan(0);
+        expect(res.body.data[res.body.data.length - 1].toStatus).toBe('Trialing');
+      });
+
+      it('rejects invalid transitions (Accepted → Applied)', async () => {
+        const res = await request(app)
+          .patch(`/api/v1/applications/${acceptedAppId}/status`)
+          .set('Authorization', `Bearer ${teamLeadToken}`)
+          .send({ status: 'Applied' });
+
+        expect(res.status).toBe(400);
+      });
+
+      it('rejects status update from non-team-lead', async () => {
+        const res = await request(app)
+          .patch(`/api/v1/applications/${testAppId}/status`)
+          .set('Authorization', `Bearer ${playerToken}`)
+          .send({ status: 'Accepted' });
+
+        expect(res.status).toBe(403);
+      });
     });
   });
 

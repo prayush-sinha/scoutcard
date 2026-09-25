@@ -2,9 +2,11 @@
 // Entry point — connects to the database then starts the HTTP server.
 // Socket.io will be attached here in Phase 3.3.
 
+import { createServer } from 'http';
 import { createApp } from './app';
 import prisma from './lib/prisma';
 import { env } from './config/env';
+import { initSocket } from './socket';
 
 async function main(): Promise<void> {
   // ── 1. Test database connection ─────────────────────────────────────────────
@@ -19,9 +21,12 @@ async function main(): Promise<void> {
   // ── 2. Create Express app ───────────────────────────────────────────────────
   const app = createApp();
 
-  // ── 3. Start HTTP server ────────────────────────────────────────────────────
-  const server = app.listen(env.PORT, () => {
-    console.log(`🚀  Server running on port ${env.PORT}  [${env.NODE_ENV}]`);
+  // ── 3. Start HTTP server + Socket.io ───────────────────────────────────────
+  const httpServer = createServer(app);
+  initSocket(httpServer);
+
+  const server = httpServer.listen(env.PORT, () => {
+    console.log(`🚀  Server + Socket.io running on port ${env.PORT}  [${env.NODE_ENV}]`);
     console.log(`📡  API base: http://localhost:${env.PORT}/api/v1`);
   });
 

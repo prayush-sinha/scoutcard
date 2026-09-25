@@ -1,10 +1,13 @@
 // src/services/application.service.ts
 // Application submission and retrieval logic for Phase 3.1.
 
+import { ApplicationStatus } from '@prisma/client';
 import prisma from '../lib/prisma';
 import { ValidationError } from '../types';
 import { isValidUuid } from '../utils/validation';
 import { ParsedPagination } from '../utils/pagination';
+import { createError } from '../middleware/errorHandler';
+import { getIO } from '../socket';
 
 // ─── Validation ───────────────────────────────────────────────────────────────
 
@@ -98,6 +101,19 @@ export async function submitApplication(
       type: 'application:created',
       payload: { applicationId: application.id, teamId, playerId },
     },
+  });
+
+  // Real-time notification to the team's room via Socket.io
+  const player = await prisma.player.findUnique({
+    where: { id: playerId },
+    select: { discordUsername: true, riotId: true },
+  });
+
+  getIO().to(`team:${teamId}`).emit('application:created', {
+    applicationId: application.id,
+    playerId,
+    playerName: player?.discordUsername ?? player?.riotId ?? 'Player',
+    status: application.status,
   });
 
   return { success: true, data: application };
@@ -223,3 +239,129 @@ const applicationSelectFields = {
   createdAt: true,
   updatedAt: true,
 } as const;
+
+// ─── Phase 3.2: Status Management & Kanban Transitions ────────────────────────
+
+// Allowed status transitions (Kanban columns)
+const VALID_TRANSITIONS: Record<ApplicationStatus, ApplicationStatus[]> = {
+  Applied: ['Reviewed', 'Trialing', 'Rejected'],
+  Reviewed: ['Trialing', 'Accepted', 'Rejected', 'Applied'],
+  Trialing: ['Accepted', 'Rejected', 'Reviewed'],
+  Accepted: [], // terminal
+  Rejected: ['Applied'], // allow reopening with a reason
+};
+
+export interface UpdateStatusInput {
+  applicationId: string;
+  newStatus: ApplicationStatus;
+  changedBy: string; // userId of the team lead / captain making the change
+  reason?: string;
+}
+
+export async function updateStatus({
+  applicationId,
+  newStatus,
+  changedBy,
+  reason,
+}: UpdateStatusInput) {
+  if (!isValidUuid(applicationId) || !isValidUuid(changedBy)) {
+    throw createError('Invalid application or user ID format.', 400);
+  }
+
+  const application = await prisma.application.findUnique({
+    where: { id: applicationId },
+    include: { team: true },
+  });
+
+  if (!application) {
+    throw createError('Application not found', 404);
+  }
+
+  // Authorization: only the team's captain can update status
+  if (application.team.captainId !== changedBy) {
+    throw createError('Not authorized to update this application', 403);
+  }
+
+  const fromStatus = application.status;
+
+  // Validate transition
+  const allowed = VALID_TRANSITIONS[fromStatus] ?? [];
+  if (!allowed.includes(newStatus)) {
+    throw createError(
+      `Invalid transition: ${fromStatus} → ${newStatus}`,
+      400
+    );
+  }
+
+  // Transaction: update status + log history + create notification
+  const result = await prisma.$transaction(async (tx) => {
+    const updated = await tx.application.update({
+      where: { id: applicationId },
+      data: { status: newStatus },
+      select: applicationSelectFields,
+    });
+
+    await tx.applicationStatusHistory.create({
+      data: {
+        applicationId,
+        fromStatus,
+        toStatus: newStatus,
+        changedBy,
+        note: reason ?? null,
+      },
+    });
+
+    await tx.notification.create({
+      data: {
+        playerId: application.playerId,
+        type: newStatus === 'Accepted' ? 'application:accepted'
+             : newStatus === 'Rejected' ? 'application:rejected'
+             : 'application:status_changed',
+        payload: {
+          applicationId,
+          teamId: application.teamId,
+          fromStatus,
+          toStatus: newStatus,
+          reason: reason ?? null,
+        },
+        isRead: false,
+      },
+    });
+
+    return updated;
+  });
+
+  // Emit real-time events via Socket.io
+  const io = getIO();
+
+  // Notify everyone viewing the team's Kanban board
+  io.to(`team:${application.teamId}`).emit('application:status_changed', {
+    applicationId,
+    fromStatus,
+    toStatus: newStatus,
+    changedBy,
+  });
+
+  // Notify the player directly (their own room)
+  io.to(`user:${application.playerId}`).emit('notification:new', {
+    type: newStatus === 'Accepted' ? 'application:accepted'
+         : newStatus === 'Rejected' ? 'application:rejected'
+         : 'application:status_changed',
+    applicationId,
+    message: `Your application status changed to ${newStatus}`,
+  });
+
+  return result;
+}
+
+export async function getStatusHistory(applicationId: string) {
+  if (!isValidUuid(applicationId)) {
+    throw createError('Invalid application ID format.', 400);
+  }
+
+  return prisma.applicationStatusHistory.findMany({
+    where: { applicationId },
+    orderBy: { changedAt: 'asc' },
+  });
+}
+

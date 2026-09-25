@@ -7,6 +7,8 @@ import {
   getTeamApplications,
   getMyApplications,
   withdrawApplication,
+  updateStatus,
+  getStatusHistory,
 } from '../services/application.service';
 import { AuthRequest } from '../types';
 import { sendSuccess, sendPaginated } from '../utils/response';
@@ -129,3 +131,49 @@ export async function withdrawApplicationHandler(
     next(err);
   }
 }
+
+/**
+ * PATCH /api/v1/applications/:id/status
+ * Team captain updates status of an application.
+ */
+export async function updateApplicationStatus(
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const id = req.params.id as string;
+    const { status, reason } = req.body;
+    const userId = req.user!.userId; // from auth middleware
+
+    const updated = await updateStatus({
+      applicationId: id,
+      newStatus: status,
+      changedBy: userId,
+      reason,
+    });
+
+    res.status(200).json({ success: true, data: updated });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * GET /api/v1/applications/:id/history
+ * View status history of an application.
+ */
+export async function getApplicationHistory(
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const id = req.params.id as string;
+    const history = await getStatusHistory(id);
+    res.status(200).json({ success: true, data: history });
+  } catch (err) {
+    next(err);
+  }
+}
+

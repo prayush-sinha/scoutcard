@@ -7,6 +7,8 @@ import {
   getTeamApplicationsHandler,
   getMyApplicationsHandler,
   withdrawApplicationHandler,
+  updateApplicationStatus,
+  getApplicationHistory,
 } from '../controllers/application.controller';
 import { verifyToken } from '../middleware/auth';
 
@@ -42,5 +44,17 @@ router.get('/team/:teamId', verifyToken, getTeamApplicationsHandler);
  * Withdraw an application. Player-only, own application.
  */
 router.delete('/:id', verifyToken, withdrawApplicationHandler);
+
+/**
+ * PATCH /api/v1/applications/:id/status
+ * Team captain updates status of an application.
+ */
+router.patch('/:id/status', verifyToken, updateApplicationStatus);
+
+/**
+ * GET /api/v1/applications/:id/history
+ * View status history of an application.
+ */
+router.get('/:id/history', verifyToken, getApplicationHistory);
 
 export default router;
