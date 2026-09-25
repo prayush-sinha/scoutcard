@@ -119,6 +119,38 @@ describe('API Integration Tests', () => {
     });
   });
 
+  describe('Application Endpoints', () => {
+    it('POST /api/v1/applications returns 401 when unauthenticated', async () => {
+      const res = await request(app)
+        .post('/api/v1/applications')
+        .send({ teamId: '00000000-0000-0000-0000-000000000000' });
+      expect(res.status).toBe(401);
+      expect(res.body.success).toBe(false);
+    });
+
+    it('GET /api/v1/applications/my-applications returns 401 when unauthenticated', async () => {
+      const res = await request(app).get('/api/v1/applications/my-applications');
+      expect(res.status).toBe(401);
+      expect(res.body.success).toBe(false);
+    });
+
+    it('GET /api/v1/applications/team/:teamId returns 401 when unauthenticated', async () => {
+      const res = await request(app).get(
+        '/api/v1/applications/team/00000000-0000-0000-0000-000000000000'
+      );
+      expect(res.status).toBe(401);
+      expect(res.body.success).toBe(false);
+    });
+
+    it('DELETE /api/v1/applications/:id returns 401 when unauthenticated', async () => {
+      const res = await request(app).delete(
+        '/api/v1/applications/00000000-0000-0000-0000-000000000000'
+      );
+      expect(res.status).toBe(401);
+      expect(res.body.success).toBe(false);
+    });
+  });
+
   describe('Verification Endpoints', () => {
     it('POST /api/v1/verification/verify-riot returns 401 when unauthenticated', async () => {
       const res = await request(app)

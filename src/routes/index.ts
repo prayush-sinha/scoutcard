@@ -6,6 +6,7 @@ import authRoutes from './auth';
 import verificationRoutes from './verification';
 import playerRoutes from './players';
 import teamRoutes from './teams';
+import applicationRoutes from './applications';
 
 
 const router = Router();
@@ -34,11 +35,12 @@ router.use('/players', playerRoutes);
 // ── Phase 2.2: Team Dashboard & Creation ──────────────────────────────────────
 router.use('/teams', teamRoutes);
 
+// ── Phase 3.1: Application System ─────────────────────────────────────────────
+router.use('/applications', applicationRoutes);
+
 // ── Future routes (uncommented as each phase is built) ────────────────────────
-// import applicationRoutes from './applications';    // Phase 3.1
 // import notificationRoutes from './notifications';  // Phase 3.3
 
-// router.use('/applications', applicationRoutes);
 // router.use('/notifications', notificationRoutes);
 
 export default router;
