@@ -1,127 +1,182 @@
-# ScoutCard — Valorant Recruiter Platform
+# ScoutCard — Valorant Premier Recruiter Platform
 
-A full-stack platform for Valorant Premier players and teams to find each other.
+A modern full-stack platform for competitive Valorant Premier players and esports teams to discover, recruit, and manage talent with verified stats and real-time scheduling.
 
-## Tech Stack
+---
 
-| Layer | Technology |
-|---|---|
-| Backend | Node.js + Express + TypeScript |
-| Database | PostgreSQL + Prisma ORM (v5) |
-| Auth | Discord OAuth 2.0 + JWT |
-| Real-time | Socket.io |
-| Testing | Jest + Supertest |
+## 🚀 Tech Stack
 
-## Project Structure
+| Layer | Technology | Description |
+|---|---|---|
+| **Frontend** | Next.js 15 (App Router), React 18, Tailwind CSS v4 | Esports dark mode UI, responsive grid layouts |
+| **Backend** | Node.js, Express, TypeScript | RESTful API + real-time Socket.io engine |
+| **Database** | PostgreSQL (Neon), Prisma ORM (v5) | Relational data, GIN array indexes, audit history |
+| **Real-time** | Socket.io | Instant Kanban status updates & application alerts |
+| **Auth** | Discord OAuth 2.0 + JWT | Secure social authentication & cookie edge gating |
+| **Verification** | Tracker.gg API + Dev Mock Fallback | Automated Riot ID verification & Trust Score calculation |
+| **UI & UX** | @dnd-kit, Lucide Icons | Smooth drag-and-drop Kanban workflow |
+| **Testing** | Jest, Supertest | Integration & unit test suites (50+ tests) |
+
+---
+
+## 📁 Project Structure
 
 ```
-src/
-├── app.ts              # Express app factory
-├── server.ts           # Entry point (DB connect → listen)
-├── config/
-│   └── env.ts          # Validated environment variables
-├── lib/
-│   └── prisma.ts       # Prisma client singleton
-├── middleware/
-│   ├── errorHandler.ts # Centralized error handling
-│   ├── notFound.ts     # 404 catch-all
-│   └── rateLimiter.ts  # Global + auth + verify limiters
-├── routes/
-│   └── index.ts        # Central router (sub-routes added per phase)
-├── types/
-│   └── index.ts        # Shared TS types (JWT payload, API shapes, enums)
-└── utils/
-    ├── availability.ts  # 168-hour week grid helpers
-    ├── pagination.ts    # Page/limit parser
-    └── response.ts      # Standard API response builders
-
-prisma/
-├── schema.prisma        # Prisma schema (all models + enums + indexes)
-└── migrations/
-    └── 001_init/
-        └── migration.sql  # Raw SQL migration (GIN indexes + triggers)
+scoutcard/
+├── src/                          # Express + TypeScript Backend
+│   ├── app.ts                    # Express app factory (middleware, CORS, routes)
+│   ├── server.ts                 # Server entry point (HTTP + Socket.io listener)
+│   ├── config/env.ts             # Validated environment configuration
+│   ├── controllers/              # Request handlers (auth, player, team, application, verification)
+│   ├── services/                 # Business logic & external API fetchers
+│   ├── routes/                   # API endpoint definitions (/api/v1/*)
+│   ├── middleware/               # Auth, rate limiting, error handler, not-found
+│   ├── socket/                   # Socket.io room management & broadcast handlers
+│   ├── utils/                    # 168-hr availability calculator, validator, pagination
+│   └── __tests__/                # Jest integration and unit test suites
+│
+├── frontend/                     # Next.js 15 App Router Frontend
+│   ├── app/                      # Next.js App Router pages
+│   │   ├── (app)/                # Authenticated layout & sub-pages
+│   │   │   ├── players/          # LFG scout card discovery & filtering
+│   │   │   ├── scout-card/edit/  # Interactive scout card creator & autosave
+│   │   │   ├── team/applications/# Real-time drag-and-drop Kanban board
+│   │   │   ├── team/settings/    # Team roster, roles, and required schedule
+│   │   │   └── my-applications/  # Player's application status tracker
+│   │   ├── auth/                 # OAuth callback & error handlers
+│   │   └── page.tsx              # Landing page
+│   ├── components/               # UI components, Kanban columns, ScheduleGrid
+│   ├── hooks/                    # useApplicationSocket custom hook
+│   ├── lib/                      # Axios API client, domain types, constants
+│   └── middleware.ts             # Edge route protection & token validation
+│
+├── prisma/
+│   ├── schema.prisma             # Database models, relations, enums & indexes
+│   ├── seed.ts                   # Development test database seed
+│   └── migrations/               # PostgreSQL migrations
+└── .env.example                  # Environment variable template
 ```
 
-## Getting Started
+---
+
+## ⚙️ Getting Started
 
 ### 1. Prerequisites
-- Node.js 18+
-- PostgreSQL 14+ running locally or via Docker
+- **Node.js**: v18.0.0 or higher
+- **PostgreSQL**: v14+ (or a cloud [Neon](https://neon.tech) database)
+- **Git**
 
-### 2. Setup
+### 2. Environment Setup
+
+#### Backend `.env`
+Create a `.env` file in the project root:
+```bash
+cp .env.example .env
+```
+Fill in the required configuration:
+- `DATABASE_URL`: Your PostgreSQL connection string
+- `JWT_SECRET`: A secure random string for JWT signing
+- `DISCORD_CLIENT_ID` & `DISCORD_CLIENT_SECRET`: From Discord Developer Portal
+- `DISCORD_REDIRECT_URI`: `http://localhost:3001/api/v1/auth/discord/callback`
+- `CLIENT_URL`: `http://localhost:3000` (Next.js frontend)
+- `TRACKER_API_KEY`: Tracker.gg API key (mock fallback is automatically enabled in `NODE_ENV=development` if omitted)
+
+#### Frontend `.env.local`
+Create a `.env.local` file inside the `frontend/` directory:
+```bash
+cd frontend
+cp .env.local.example .env.local
+cd ..
+```
+Defaults:
+```env
+NEXT_PUBLIC_API_URL=http://localhost:3001
+NEXT_PUBLIC_SOCKET_URL=http://localhost:3001
+```
+
+---
+
+### 3. Installation & Database Migration
 
 ```bash
-# Clone and install
+# Install backend dependencies
 npm install
 
-# Copy environment file
-cp .env.example .env
-# → Edit .env with your DATABASE_URL, JWT_SECRET, Discord credentials
-```
+# Install frontend dependencies
+cd frontend && npm install && cd ..
 
-### 3. Database Setup
-
-```bash
-# Run Prisma migration (creates all tables)
+# Run database migrations
 npm run db:migrate
 
-# OR use the raw SQL directly:
-psql $DATABASE_URL -f prisma/migrations/001_init/migration.sql
+# (Optional) Seed initial mock players and teams
+npm run db:seed
 ```
 
-### 4. Run Development Server
+---
+
+### 4. Running the Development Servers
+
+You can run both services concurrently:
 
 ```bash
+# Terminal 1 — Start the Backend (port 3001)
 npm run dev
-# → Server on http://localhost:3001
-# → API at http://localhost:3001/api/v1
-# → Health: http://localhost:3001/api/v1/health
+
+# Terminal 2 — Start the Frontend (port 3000)
+cd frontend
+npm run dev
 ```
 
-### 5. Build for Production
+- **Frontend App**: [http://localhost:3000](http://localhost:3000)
+- **Backend API**: [http://localhost:3001/api/v1](http://localhost:3001/api/v1)
+- **API Health Check**: [http://localhost:3001/api/v1/health](http://localhost:3001/api/v1/health)
+
+---
+
+## 🧪 Testing
+
+The backend includes a comprehensive Jest and Supertest test suite testing integration endpoints, schedule overlap algorithms, and validation rules:
 
 ```bash
-npm run build
-npm start
+npm test
 ```
 
-## Environment Variables
-
-See [.env.example](.env.example) for all required variables.
-
-| Variable | Required | Description |
-|---|---|---|
-| `DATABASE_URL` | ✅ | PostgreSQL connection string |
-| `JWT_SECRET` | ✅ | Secret for signing JWTs |
-| `DISCORD_CLIENT_ID` | Phase 1.2 | Discord app client ID |
-| `DISCORD_CLIENT_SECRET` | Phase 1.2 | Discord app secret |
-| `TRACKER_API_KEY` | Phase 1.3 | Tracker.gg API key |
-
-## Database Schema
-
-```
-players ──── applications ──── teams
-   │               │
-   └── notifications  └── application_status_history
+To run individual test suites:
+```bash
+npx jest src/__tests__/api.test.ts          # API integration tests
+npx jest src/__tests__/availability.test.ts # 168-hour schedule grid math
+npx jest src/__tests__/validation.test.ts   # Funnel & input validations
 ```
 
-### Key Design Decisions
-- **GIN indexes** on `main_agents`, `playstyle_tags`, `available_hours` arrays for fast containment queries
-- **168-integer array** for weekly availability (0 = Mon 00:00 → 167 = Sun 23:00)
-- **UNIQUE(player_id, team_id)** constraint prevents duplicate applications
-- **ApplicationStatusHistory** audit table tracks every Kanban column move
+---
 
-## Build Status — Phase Progress
+## 🔑 Core Features
 
-| Phase | Status |
-|---|---|
-| **1.1 Project Setup & DB Schema** | ✅ Complete |
-| **1.2 Discord OAuth Authentication** | ✅ Complete |
-| **1.3 Riot ID & Trust Score Verification** | ✅ Complete |
-| **2.1 Scout Card Form** | ✅ Complete |
-| **2.2 Team Dashboard** | ✅ Complete |
-| **2.3 Player Search** | ✅ Complete |
-| 3.1 Application System | 🔲 Pending |
-| 3.2 Kanban Board | 🔲 Pending |
-| 3.3 Socket.io Real-time | 🔲 Pending |
-| 4.x Polish & Deploy | 🔲 Pending |
+- **Verified Scout Cards**: Riot ID verification with Tracker.gg stats, peak ranks, trust scores, agent preferences, Medal.tv / YouTube VOD clips, and an interactive 168-hour weekly availability matrix.
+- **Smart LFG Discovery**: Search players filtered by Premier division, main/flex agents, playstyle tags (IGL, Entry, Lurk, Support, Anchor), and real-time team schedule overlap percentages.
+- **Interactive Kanban Recruitment**: Team captains manage candidate pipelines across 4 stages (`Applied`, `Reviewed`, `Trialing`, `Accepted` / `Rejected`) with strict state transition enforcement, status history audits, and real-time Socket.io synchronization.
+- **Team Roster & Schedule Coordination**: Define required practice hours, manage player roles, and track candidate compatibility automatically.
+
+---
+
+## 📊 Development Progress
+
+| Phase | Milestone | Status |
+|---|---|:---:|
+| **1.1** | Project Setup & PostgreSQL Schema with GIN indexes | ✅ Complete |
+| **1.2** | Discord OAuth 2.0 & JWT Authentication | ✅ Complete |
+| **1.3** | Riot ID Verification & Trust Score Engine | ✅ Complete |
+| **2.1** | Scout Card API, Draft Autosave & VOD Validation | ✅ Complete |
+| **2.2** | Team Dashboard & Mandatory Practice Schedules | ✅ Complete |
+| **2.3** | Player Search & Schedule Overlap Scoring | ✅ Complete |
+| **3.1** | Team Application System & History Logging | ✅ Complete |
+| **3.2** | Kanban Status Machine & Audit Trail | ✅ Complete |
+| **3.3** | Real-time Socket.io Sync Engine | ✅ Complete |
+| **4.1** | Next.js 15 Client & Drag-and-Drop Kanban Board | ✅ Complete |
+| **4.2** | Final Verification & Production Hardening | 🔄 In Progress |
+
+---
+
+## 🛡️ License
+
+This project is licensed under the MIT License.
