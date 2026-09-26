@@ -88,12 +88,13 @@ export async function verifyPlayer(
 ): Promise<TrustScoreResult> {
   // ── 24-hour re-verification cooldown ─────────────────────────────────────────
   // Prevents players from hammering the Tracker API and re-scoring every 5 minutes.
+  // In dev mode, allow re-verification freely for testing.
   const existing = await prisma.player.findUnique({
     where: { id: playerId },
     select: { verifiedAt: true, riotId: true, isVerified: true, trustScore: true, verificationTier: true },
   });
 
-  if (existing?.verifiedAt) {
+  if (existing?.verifiedAt && !env.isDev) {
     const msSinceVerification = Date.now() - existing.verifiedAt.getTime();
     const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
 
@@ -143,7 +144,7 @@ export async function verifyPlayer(
       isVerified: verified,
       trustScore: score,
       verificationTier: tier,
-      verifiedAt: new Date(),
+      verifiedAt: verified ? new Date() : (env.isDev ? null : new Date()),
     },
   });
 
@@ -159,7 +160,7 @@ export async function verifyPlayer(
   if (!verified) {
     result.reason =
       score === 0
-        ? 'Could not fetch account data from Tracker.gg — check your Riot ID format (e.g. TenZ#NA1)'
+        ? 'Could not fetch account data from Tracker.gg — the profile may be private or Tracker.gg is unreachable'
         : 'New or inactive account — not enough match history to verify automatically';
   }
 
@@ -185,7 +186,31 @@ export async function getVerificationStatus(playerId: string) {
 
 // ─── Tracker.gg fetcher ───────────────────────────────────────────────────────
 
+function getDevMockTrackerData(name: string, tag: string): TrackerSummary {
+  return {
+    riotId: `${name}#${tag}`,
+    playerName: name,
+    playerTag: tag,
+    rank: 'Ascendant 2',
+    rankTier: 20,
+    peakRank: 'Immortal 1',
+    matchesPlayed: 165,
+    hoursPlayed: 190,
+    winRate: 53,
+    lastUpdated: new Date().toISOString(),
+  };
+}
+
 async function fetchTrackerData(name: string, tag: string): Promise<TrackerSummary | null> {
+  // If no Tracker API key is configured or it's placeholder, in dev mode return mock data
+  if (!env.TRACKER_API_KEY || env.TRACKER_API_KEY === 'your_tracker_gg_api_key') {
+    if (env.isDev) {
+      console.info(`[verification.service] Dev mode active (no TRACKER_API_KEY): using mock data for ${name}#${tag}`);
+      return getDevMockTrackerData(name, tag);
+    }
+    return null;
+  }
+
   // encodeURIComponent converts '#' → '%23', which is what Tracker.gg v2 expects.
   // Do NOT double-encode or split on '/' — the API uses the full encoded handle as one path segment.
   const encodedRiotId = encodeURIComponent(`${name}#${tag}`);
@@ -232,6 +257,16 @@ async function fetchTrackerData(name: string, tag: string): Promise<TrackerSumma
   } catch (err) {
     const axiosErr = err as AxiosError;
 
+    // 401 = unauthorized (invalid API key in .env)
+    if (axiosErr.response?.status === 401) {
+      console.warn('[verification.service] Tracker.gg API key rejected (401 Unauthorized).');
+      if (env.isDev) {
+        console.info(`[verification.service] Dev mode active: falling back to mock data for ${name}#${tag}`);
+        return getDevMockTrackerData(name, tag);
+      }
+      return null;
+    }
+
     // 404 = player not found on Tracker
     if (axiosErr.response?.status === 404) {
       return null;
@@ -245,6 +280,10 @@ async function fetchTrackerData(name: string, tag: string): Promise<TrackerSumma
 
     // Network error or timeout
     console.error('Tracker.gg fetch error:', axiosErr.message);
+    if (env.isDev) {
+      console.info(`[verification.service] Dev mode active (network error): falling back to mock data for ${name}#${tag}`);
+      return getDevMockTrackerData(name, tag);
+    }
     return null;
   }
 }

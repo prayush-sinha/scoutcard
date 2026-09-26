@@ -7,7 +7,14 @@ dist/
 # Environment secrets (NEVER COMMIT)
 .env
 .env.*
-!.env.example
+.env.local
+.env.*.local
+**/.env
+**/.env.*
+**/.env.local
+**/.env.*.local
+!**/.env.example
+!**/.env*.example
 
 # Neon CLI & Project config
 .neon
@@ -33,3 +40,9 @@ Thumbs.db
 
 # Test coverage
 coverage/
+
+# Frontend (Next.js) — nested project
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/tsconfig.tsbuildinfo

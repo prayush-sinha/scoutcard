@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------
+   ScoutCard design tokens — Esports Dark Mode
+   Inspired by Tracker.gg's data density and Gankster's recruiting flow.
+   Sharp, tactical, high-contrast. Not a generic SaaS dashboard.
+   ------------------------------------------------------------------- */
+@theme {
+  --color-background: #0f111a;
+  --color-card: #161925;
+  --color-muted: #1f2336;
+  --color-border: #2a2e40;
+
+  --color-primary: #ff4655; /* Valorant red */
+  --color-primary-foreground: #f8f9fa;
+  --color-success: #00e5bc; /* Radianite teal — verified / accepted */
+
+  --color-foreground: #f8f9fa;
+  --color-foreground-muted: #8b92a5;
+
+  --color-warning: #ffb454;
+  --color-danger: #ff4655;
+
+  --radius-sm: 2px;
+  --radius-md: 3px;
+
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+  html,
+  body {
+    background: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+  }
+  ::selection {
+    background: var(--color-primary);
+    color: var(--color-foreground);
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-success);
+    outline-offset: 2px;
+  }
+}
+
+@layer utilities {
+  /* Thin scrollbars for Kanban columns and long lists — data-dense, not chrome-heavy */
+  .scroll-thin {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border) transparent;
+  }
+  .scroll-thin::-webkit-scrollbar {
+    width: 6px;
+  }
+  .scroll-thin::-webkit-scrollbar-thumb {
+    background: var(--color-border);
+    border-radius: 3px;
+  }
+}
