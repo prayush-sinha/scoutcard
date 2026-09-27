@@ -162,6 +162,7 @@ export async function updateApplicationStatus(
 /**
  * GET /api/v1/applications/:id/history
  * View status history of an application.
+ * Caller must be the applicant or the team captain (enforced in service).
  */
 export async function getApplicationHistory(
   req: AuthRequest,
@@ -170,7 +171,8 @@ export async function getApplicationHistory(
 ): Promise<void> {
   try {
     const id = req.params.id as string;
-    const history = await getStatusHistory(id);
+    const requestingUserId = req.user!.userId;
+    const history = await getStatusHistory(id, requestingUserId);
     res.status(200).json({ success: true, data: history });
   } catch (err) {
     next(err);

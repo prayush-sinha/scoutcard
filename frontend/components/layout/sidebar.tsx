@@ -6,6 +6,9 @@ import { usePathname } from "next/navigation";
 import { LayoutDashboard, Search, Contact, ListChecks, Users, KanbanSquare, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { authApi } from "@/lib/api";
+import { ScoutCardSidebarMark } from "@/components/logo";
+
+import type { AuthenticatedPlayer } from "@/lib/types";
 
 const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -18,13 +21,13 @@ const NAV_ITEMS = [
 
 export function Sidebar() {
   const pathname = usePathname();
-  const [username, setUsername] = React.useState<string | null>(null);
+  const [me, setMe] = React.useState<AuthenticatedPlayer | null>(null);
 
   React.useEffect(() => {
     authApi
       .me()
-      .then((me) => setUsername(me.discordUsername))
-      .catch(() => setUsername(null));
+      .then((data) => setMe(data))
+      .catch(() => setMe(null));
   }, []);
 
   const logout = async () => {
@@ -37,9 +40,8 @@ export function Sidebar() {
 
   return (
     <aside className="fixed inset-y-0 left-0 z-30 flex w-64 flex-col border-r border-border bg-card">
-      <div className="flex h-16 items-center gap-2 border-b border-border px-5">
-        <span className="h-2.5 w-2.5 rounded-sm bg-primary" />
-        <span className="text-sm font-bold uppercase tracking-widest">ScoutCard</span>
+      <div className="flex h-16 items-center border-b border-border px-4">
+        <ScoutCardSidebarMark />
       </div>
 
       <nav className="flex-1 overflow-y-auto scroll-thin px-2 py-4">
@@ -64,13 +66,36 @@ export function Sidebar() {
         })}
       </nav>
 
-      <div className="border-t border-border p-4">
-        <p className="mb-2 truncate text-[11px] text-foreground-muted">
-          {username ? <>Signed in as <span className="text-foreground">{username}</span></> : "Connected to Valorant Premier"}
-        </p>
+      {/* ── User identity panel ── */}
+      <div className="border-t border-border p-3">
+        <div className="mb-2 flex items-center gap-3 overflow-hidden rounded-sm bg-muted/50 px-2.5 py-2">
+          {/* Avatar */}
+          {me?.discordAvatar ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={me.discordAvatar}
+              alt={me.discordUsername ?? "Discord avatar"}
+              width={32}
+              height={32}
+              className="h-8 w-8 shrink-0 rounded-full object-cover ring-2 ring-primary/30"
+            />
+          ) : (
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/20 text-[11px] font-bold uppercase text-primary ring-2 ring-primary/30">
+              {me?.discordUsername?.[0] ?? "?"}
+            </span>
+          )}
+          {/* Name */}
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[12px] font-semibold text-foreground">
+              {me?.discordUsername ?? "Loading…"}
+            </p>
+            <p className="text-[10px] text-foreground-muted">Discord account</p>
+          </div>
+        </div>
+
         <button
           onClick={logout}
-          className="flex items-center gap-2 text-[11px] font-medium text-foreground-muted transition-colors hover:text-danger"
+          className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-[11px] font-medium text-foreground-muted transition-colors hover:bg-danger/10 hover:text-danger"
         >
           <LogOut size={13} /> Sign out
         </button>

@@ -11,6 +11,7 @@ import type {
   TeamPayload,
   TrustScoreResult,
   VerificationStatus,
+  PlayerTrackerStats,
 } from "./types";
 
 export const api = axios.create({
@@ -110,6 +111,8 @@ export const playerApi = {
   },
   getById: (id: string, teamId?: string) =>
     api.get<Envelope<ScoutCard>>(`/players/${id}`, { params: teamId ? { teamId } : undefined }).then(unwrap),
+  getTrackerStats: (id: string) =>
+    api.get<Envelope<PlayerTrackerStats>>(`/players/${id}/tracker-stats`).then(unwrap),
 };
 
 // ---- Teams ----

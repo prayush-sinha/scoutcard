@@ -225,3 +225,20 @@ export interface PlayerSearchFilters {
   page?: number;
   limit?: number;
 }
+
+export interface PlayerTrackerStats {
+  riotId: string;
+  playerName: string;
+  playerTag: string;
+  rank: string;
+  rankTier: number;
+  peakRank: string;
+  matchesPlayed: number;
+  hoursPlayed: number;
+  winRate: number;
+  kdRatio?: number;
+  headshotPct?: number;
+  damagePerRound?: number;
+  trackerUrl: string;
+  lastUpdated: string;
+}

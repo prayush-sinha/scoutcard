@@ -2,15 +2,13 @@ import Link from "next/link";
 import { ShieldCheck, Radar, Swords } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { authApi } from "@/lib/api";
+import { ScoutCardWordmark } from "@/components/logo";
 
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-background">
-      <header className="flex items-center justify-between border-b border-border px-8 py-5">
-        <div className="flex items-center gap-2">
-          <span className="h-2.5 w-2.5 rounded-sm bg-primary" />
-          <span className="text-sm font-bold uppercase tracking-widest">ScoutCard</span>
-        </div>
+      <header className="flex items-center justify-between border-b border-border px-8 py-4">
+        <ScoutCardWordmark />
         <a href={authApi.discordLoginUrl()}>
           <Button size="sm">Sign in with Discord</Button>
         </a>

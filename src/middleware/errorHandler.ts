@@ -63,6 +63,18 @@ export function errorHandler(
     }
   }
 
+  // ── Prisma validation errors ───────────────────────────────────────────────
+  // PrismaClientValidationError is thrown for schema/type mismatches such as
+  // passing an invalid enum value (e.g. ?status=pending vs Applied|Reviewed…).
+  // These are always caller errors and must return 400, never 500.
+  if (err instanceof Prisma.PrismaClientValidationError) {
+    res.status(400).json({
+      success: false,
+      error: 'Invalid query or request body: one or more values do not match the expected schema.',
+    });
+    return;
+  }
+
   // ── Generic handler ──────────────────────────────────────────────────────────
   const statusCode = err.statusCode ?? 500;
 

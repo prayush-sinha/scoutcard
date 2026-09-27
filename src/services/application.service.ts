@@ -75,35 +75,43 @@ export async function submitApplication(
     };
   }
 
-  const application = await prisma.application.create({
-    data: {
-      playerId,
-      teamId,
-      message: message?.trim() || null,
-    },
-    select: applicationSelectFields,
+  // Transaction: create application + audit row + notification atomically.
+  // A crash between steps previously left an orphan Application with no history
+  // row and no captain notification, and the UNIQUE(playerId, teamId) constraint
+  // then prevented the player from ever re-applying.
+  const application = await prisma.$transaction(async (tx) => {
+    const created = await tx.application.create({
+      data: {
+        playerId,
+        teamId,
+        message: message?.trim() || null,
+      },
+      select: applicationSelectFields,
+    });
+
+    // Initial history entry (fromStatus null → Applied)
+    await tx.applicationStatusHistory.create({
+      data: {
+        applicationId: created.id,
+        fromStatus: null,
+        toStatus: 'Applied',
+        changedBy: playerId,
+      },
+    });
+
+    // Notify the team captain
+    await tx.notification.create({
+      data: {
+        playerId: team.captainId,
+        type: 'application:created',
+        payload: { applicationId: created.id, teamId, playerId },
+      },
+    });
+
+    return created;
   });
 
-  // Initial history entry (fromStatus null → Applied)
-  await prisma.applicationStatusHistory.create({
-    data: {
-      applicationId: application.id,
-      fromStatus: null,
-      toStatus: 'Applied',
-      changedBy: playerId,
-    },
-  });
-
-  // Notify the team captain
-  await prisma.notification.create({
-    data: {
-      playerId: team.captainId,
-      type: 'application:created',
-      payload: { applicationId: application.id, teamId, playerId },
-    },
-  });
-
-  // Real-time notification to the team's room via Socket.io
+  // Real-time notification to the team's room via Socket.io (after commit)
   const player = await prisma.player.findUnique({
     where: { id: playerId },
     select: { discordUsername: true, riotId: true },
@@ -142,9 +150,20 @@ export async function getTeamApplications(
     return { success: false, error: 'Only the captain can view this team\'s applications.', status: 403 };
   }
 
+  // Validate the status filter before it reaches Prisma — an invalid enum value
+  // throws PrismaClientValidationError which the error handler surfaces as a 500.
+  const validStatuses = Object.values(ApplicationStatus);
+  if (status !== undefined && !validStatuses.includes(status as ApplicationStatus)) {
+    return {
+      success: false,
+      error: `Invalid status filter. Allowed values: ${validStatuses.join(', ')}.`,
+      status: 400,
+    };
+  }
+
   const where = {
     teamId,
-    ...(status && { status: status as never }),
+    ...(status && { status: status as ApplicationStatus }),
   };
 
   const [data, total] = await Promise.all([
@@ -354,9 +373,29 @@ export async function updateStatus({
   return result;
 }
 
-export async function getStatusHistory(applicationId: string) {
+export async function getStatusHistory(applicationId: string, requestingUserId: string) {
   if (!isValidUuid(applicationId)) {
     throw createError('Invalid application ID format.', 400);
+  }
+
+  // Fetch the application with enough context to authorize the caller.
+  const application = await prisma.application.findUnique({
+    where: { id: applicationId },
+    select: {
+      playerId: true,
+      team: { select: { captainId: true } },
+    },
+  });
+
+  if (!application) {
+    throw createError('Application not found.', 404);
+  }
+
+  // IDOR guard: only the applicant or the team captain may read audit history.
+  const isPlayer = application.playerId === requestingUserId;
+  const isCaptain = application.team.captainId === requestingUserId;
+  if (!isPlayer && !isCaptain) {
+    throw createError('Forbidden: you are not authorized to view this application\'s history.', 403);
   }
 
   return prisma.applicationStatusHistory.findMany({

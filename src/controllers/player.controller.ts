@@ -10,6 +10,7 @@ import {
   searchPlayers,
   getPlayerById,
 } from '../services/player.service';
+import { getPlayerTrackerStats } from '../services/verification.service';
 import {
   AuthRequest,
   ScoutCardInput,
@@ -234,3 +235,34 @@ export async function getPlayerProfileHandler(
     next(err);
   }
 }
+
+/**
+ * GET /api/v1/players/:id/tracker-stats
+ * Returns live/scraped Tracker Network stats for a player.
+ */
+export async function getPlayerTrackerStatsHandler(
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const playerId = req.params.id as string;
+
+    if (!isValidUuid(playerId)) {
+      sendError(res, 'Invalid player ID format.', 400);
+      return;
+    }
+
+    const stats = await getPlayerTrackerStats(playerId);
+
+    if (!stats) {
+      sendError(res, 'No Tracker Network stats found for this player or profile is private.', 404);
+      return;
+    }
+
+    sendSuccess(res, stats, 'Tracker Network stats retrieved.');
+  } catch (err) {
+    next(err);
+  }
+}
+

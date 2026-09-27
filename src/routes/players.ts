@@ -9,6 +9,7 @@ import {
   autosaveDraft,
   searchPlayersHandler,
   getPlayerProfileHandler,
+  getPlayerTrackerStatsHandler,
 } from '../controllers/player.controller';
 import { verifyToken, optionalToken } from '../middleware/auth';
 
@@ -75,6 +76,12 @@ router.put('/scout-card', verifyToken, updateScoutCard);
  * Frontend calls this every 30 seconds while the player is filling out the form.
  */
 router.post('/scout-card/draft', verifyToken, autosaveDraft);
+
+/**
+ * GET /api/v1/players/:id/tracker-stats
+ * Real-time / scraped Tracker Network statistics for a player.
+ */
+router.get('/:id/tracker-stats', optionalToken, getPlayerTrackerStatsHandler);
 
 /**
  * GET /api/v1/players/:id  (registered last — must come after all named routes)

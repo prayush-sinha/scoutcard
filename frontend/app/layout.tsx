@@ -4,6 +4,10 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "ScoutCard — Valorant Premier Recruiting",
   description: "Where verified Valorant Premier players and teams find each other.",
+  icons: {
+    icon: "/icon.svg",
+    apple: "/icon.svg",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
