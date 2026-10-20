@@ -66,10 +66,10 @@ export function validateScoutCard(
     errors.push({ field: 'division', message: 'Premier division is required to publish.' });
   }
 
-  // Main agents — exactly 2 required to publish, must be valid Valorant agents
+  // Main agents — 1-4 required to publish, must be valid Valorant agents, no duplicates
   if (input.mainAgents !== undefined) {
-    if (!Array.isArray(input.mainAgents) || input.mainAgents.length !== 2) {
-      errors.push({ field: 'mainAgents', message: 'Exactly 2 main agents are required.' });
+    if (!Array.isArray(input.mainAgents) || input.mainAgents.length < 1 || input.mainAgents.length > 4) {
+      errors.push({ field: 'mainAgents', message: 'Between 1 and 4 main agents are required.' });
     } else {
       const invalidAgents = input.mainAgents.filter(
         (a) => !(VALORANT_AGENTS as readonly string[]).includes(a)
@@ -80,9 +80,13 @@ export function validateScoutCard(
           message: `Invalid agent(s): ${invalidAgents.join(', ')}. Must be valid Valorant agents.`,
         });
       }
+      const unique = new Set(input.mainAgents);
+      if (unique.size !== input.mainAgents.length) {
+        errors.push({ field: 'mainAgents', message: 'Duplicate main agents are not allowed.' });
+      }
     }
   } else if (mode === 'publish') {
-    errors.push({ field: 'mainAgents', message: 'Exactly 2 main agents are required to publish.' });
+    errors.push({ field: 'mainAgents', message: 'At least 1 main agent is required to publish.' });
   }
 
   // Flex agent — required to publish, must be a valid Valorant agent, and cannot duplicate a main agent
@@ -252,7 +256,7 @@ export function calculateCompletionScore(player: {
   if (player.riotId) score += 15;                          // Riot ID linked
   if (player.isVerified) score += 10;                      // Verified badge
   if (player.division) score += 15;                        // Division selected
-  if (player.mainAgents.length === 2) score += 20;         // Both main agents set
+  if (player.mainAgents.length >= 1 && player.mainAgents.length <= 4) score += 20; // 1-4 main agents set
   if (player.flexAgent) score += 10;                       // Flex agent set
   if (player.playstyleTags.length > 0) score += 10;        // At least 1 playstyle tag
   if (player.vodUrl) score += 10;                          // VOD link uploaded

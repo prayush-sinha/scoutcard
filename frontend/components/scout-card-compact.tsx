@@ -1,7 +1,7 @@
 import Image from "next/image";
 import { BadgeCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { DIVISION_LABEL } from "@/lib/constants";
+import { DIVISION_LABEL, AGENT_ICON } from "@/lib/constants";
 import { trustTier, type Application } from "@/lib/types";
 import { timeAgo } from "@/lib/utils";
 
@@ -29,10 +29,14 @@ export function ScoutCardCompact({ application, onClick }: { application: Applic
         {p && <Badge variant={TRUST_VARIANT[trustTier(p.trustScore)]}>{p.trustScore}</Badge>}
       </div>
 
-      <div className="flex flex-wrap items-center gap-1 text-[11px] text-foreground-muted">
+      <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-foreground-muted">
         {p && <span>{DIVISION_LABEL[p.division]}</span>}
         {p?.mainAgents.map((a) => (
-          <span key={a} className="rounded-sm bg-muted px-1.5 py-0.5">
+          <span key={a} className="flex items-center gap-1 rounded-sm bg-muted px-1.5 py-0.5 font-medium text-foreground">
+            {AGENT_ICON[a] && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={AGENT_ICON[a]} alt="" width={14} height={14} className="h-3.5 w-3.5 rounded-full object-cover" />
+            )}
             {a}
           </span>
         ))}

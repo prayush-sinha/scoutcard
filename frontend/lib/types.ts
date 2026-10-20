@@ -71,7 +71,7 @@ export interface ScoutCard {
   isVerified: boolean;
   trustScore: number;
   division: PremierDivision;
-  mainAgents: string[]; // exactly 2 to publish
+  mainAgents: string[]; // 1-4 to publish
   flexAgent: string | null;
   playstyleTags: PlaystyleTag[]; // 1-2 to publish
   vodUrl: string | null;

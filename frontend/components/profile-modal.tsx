@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { DIVISION_LABEL } from "@/lib/constants";
+import { DIVISION_LABEL, AGENT_ICON } from "@/lib/constants";
 import { applicationApi, playerApi } from "@/lib/api";
 import {
   trustTier,
@@ -194,8 +194,12 @@ export function ProfileModal({ open, onOpenChange, card, scheduleMatchPercent, a
               {card.mainAgents?.map((agent) => (
                 <span
                   key={agent}
-                  className="flex items-center gap-1 rounded-sm border border-primary/40 bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary"
+                  className="flex items-center gap-1.5 rounded-sm border border-primary/40 bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary"
                 >
+                  {AGENT_ICON[agent] && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={AGENT_ICON[agent]} alt="" width={18} height={18} className="h-4 w-4 rounded-full object-cover" />
+                  )}
                   {agent}
                   <span className="ml-1 rounded-sm bg-primary/20 px-1 text-[9px] font-bold uppercase tracking-wider text-primary/80">
                     Main
@@ -203,7 +207,11 @@ export function ProfileModal({ open, onOpenChange, card, scheduleMatchPercent, a
                 </span>
               ))}
               {card.flexAgent && (
-                <span className="flex items-center gap-1 rounded-sm border border-warning/40 bg-warning/10 px-2.5 py-1 text-xs font-semibold text-warning">
+                <span className="flex items-center gap-1.5 rounded-sm border border-warning/40 bg-warning/10 px-2.5 py-1 text-xs font-semibold text-warning">
+                  {AGENT_ICON[card.flexAgent] && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={AGENT_ICON[card.flexAgent]} alt="" width={18} height={18} className="h-4 w-4 rounded-full object-cover" />
+                  )}
                   {card.flexAgent}
                   <span className="ml-1 rounded-sm bg-warning/20 px-1 text-[9px] font-bold uppercase tracking-wider text-warning/80">
                     Flex
