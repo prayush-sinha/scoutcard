@@ -19,38 +19,39 @@ interface ScoutCardProps {
   className?: string;
 }
 
-/** Agent tile — portrait icon if available, abbreviated name fallback. */
+/** Agent tile — compact, tactical, centered portrait avatar with clear label */
 function AgentTile({ name, slot }: { name: string | null | undefined; slot: string }) {
   const iconUrl = name ? AGENT_ICON[name] : null;
   return (
     <div
       className={cn(
-        "flex flex-col items-center justify-end rounded-sm border overflow-hidden relative",
-        name ? "border-border bg-muted" : "border-dashed border-border/60 bg-transparent"
+        "flex flex-col items-center justify-center rounded-sm border px-2 py-2.5 text-center transition-colors",
+        name ? "border-border bg-muted/60" : "border-dashed border-border/60 bg-transparent"
       )}
-      style={{ aspectRatio: "1 / 1.1" }}
     >
-      {iconUrl ? (
-        <Image
-          src={iconUrl}
-          alt={name ?? ""}
-          fill
-          sizes="80px"
-          className="object-cover object-top"
-          unoptimized
-        />
-      ) : (
-        <span className="font-display absolute inset-0 flex items-center justify-center text-2xl font-bold text-foreground-muted">
-          {name ? name.slice(0, 2).toUpperCase() : "—"}
-        </span>
-      )}
-      {/* Label bar */}
-      <div className="relative z-10 w-full bg-background/80 px-1 py-0.5 text-center backdrop-blur-sm">
-        <p className="truncate text-[11px] font-semibold leading-tight text-foreground">
-          {name ?? "Open"}
-        </p>
-        <p className="text-[9px] uppercase tracking-wide text-foreground-muted">{slot}</p>
+      <div className="relative mb-1.5 h-10 w-10 shrink-0 overflow-hidden rounded-full border border-border/80 bg-background/80 ring-1 ring-border/50">
+        {iconUrl ? (
+          <Image
+            src={iconUrl}
+            alt={name ?? ""}
+            fill
+            sizes="40px"
+            className="object-cover"
+            unoptimized
+          />
+        ) : (
+          <span className="font-display flex h-full w-full items-center justify-center text-sm font-bold text-foreground-muted">
+            {name ? name.slice(0, 2).toUpperCase() : "—"}
+          </span>
+        )}
       </div>
+
+      <p className="truncate text-xs font-bold leading-tight text-foreground">
+        {name ?? "Open"}
+      </p>
+      <p className="mt-0.5 text-[9px] font-semibold uppercase tracking-wider text-foreground-muted">
+        {slot}
+      </p>
     </div>
   );
 }
@@ -60,8 +61,9 @@ export function ScoutCard({ card, onViewProfile, onInvite, className }: ScoutCar
   const tier = TIER_STYLE[trustTier(card.trustScore)];
   const hasActions = !!onViewProfile || !!onInvite;
 
-  // Up to 4 main slots displayed; flex shown separately if present
-  const mainSlots = Array.from({ length: Math.max(card.mainAgents.length, 2) }, (_, i) => ({
+  // 1-4 main slots displayed
+  const mainCount = Math.max(card.mainAgents.length, 2);
+  const mainSlots = Array.from({ length: mainCount }, (_, i) => ({
     name: card.mainAgents[i] ?? null,
     slot: "Main",
   }));
@@ -117,9 +119,9 @@ export function ScoutCard({ card, onViewProfile, onInvite, className }: ScoutCar
           </p>
         )}
 
-        {/* ── Agent grid: mains row + optional flex ── */}
+        {/* ── Agent grid: mains row + optional compact flex ── */}
         <div className="space-y-2 px-4">
-          {/* Main agents — dynamic count */}
+          {/* Main agents — dynamic 2, 3, or 4 columns */}
           <div
             className="grid gap-2"
             style={{ gridTemplateColumns: `repeat(${mainSlots.length}, minmax(0, 1fr))` }}
@@ -129,18 +131,29 @@ export function ScoutCard({ card, onViewProfile, onInvite, className }: ScoutCar
             ))}
           </div>
 
-          {/* Flex agent — only shown if filled */}
+          {/* Flex agent — sleek compact banner */}
           {card.flexAgent && (
-            <div className="grid grid-cols-4 gap-2">
-              <div className="col-span-1">
-                <AgentTile name={card.flexAgent} slot="Flex" />
+            <div className="flex items-center gap-2 rounded-sm border border-warning/30 bg-warning/5 px-2.5 py-1.5">
+              <div className="relative h-6 w-6 shrink-0 overflow-hidden rounded-full border border-warning/40 bg-card">
+                {AGENT_ICON[card.flexAgent] ? (
+                  <Image
+                    src={AGENT_ICON[card.flexAgent]}
+                    alt={card.flexAgent}
+                    fill
+                    sizes="24px"
+                    className="object-cover"
+                    unoptimized
+                  />
+                ) : (
+                  <span className="flex h-full w-full items-center justify-center text-[9px] font-bold text-warning">
+                    {card.flexAgent.slice(0, 2).toUpperCase()}
+                  </span>
+                )}
               </div>
-              <div className="col-span-3 flex items-center">
-                <p className="text-xs text-foreground-muted">
-                  Can flex to{" "}
-                  <span className="font-semibold text-foreground">{card.flexAgent}</span> if needed
-                </p>
-              </div>
+              <p className="min-w-0 flex-1 truncate text-xs text-foreground-muted">
+                Flex: <span className="font-semibold text-warning">{card.flexAgent}</span>
+                <span className="ml-1 text-[11px] text-foreground-muted/70">· Secondary fill</span>
+              </p>
             </div>
           )}
         </div>
