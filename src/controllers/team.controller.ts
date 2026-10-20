@@ -8,9 +8,11 @@ import {
   getTeamById,
   updateTeam,
   disbandTeam,
+  searchTeams,
+  TeamSearchQuery,
 } from '../services/team.service';
 import { AuthRequest, TeamInput } from '../types';
-import { sendSuccess, sendError } from '../utils/response';
+import { sendSuccess, sendError, sendPaginated } from '../utils/response';
 import { isValidUuid } from '../utils/validation';
 
 /**
@@ -159,6 +161,31 @@ export async function disbandTeamHandler(
     }
 
     sendSuccess(res, null, 'Team disbanded. All applications have been removed.');
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * GET /api/v1/teams
+ * Paginated search/directory of teams looking for players.
+ *
+ * Query params:
+ *   division   — Premier division filter
+ *   role       — Role filter (e.g. Controller)
+ *   recruiting — "true" (default) | "false" | "all"
+ *   page       — Page number (default: 1)
+ *   limit      — Results per page (default: 20)
+ */
+export async function searchTeamsHandler(
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const query = req.query as TeamSearchQuery;
+    const { data, total, page, limit } = await searchTeams(query);
+    sendPaginated(res, data, { page, limit, total });
   } catch (err) {
     next(err);
   }

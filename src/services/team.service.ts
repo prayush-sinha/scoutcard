@@ -2,7 +2,7 @@
 // Team creation, retrieval, update, and disbanding logic for Phase 2.2.
 
 import prisma from '../lib/prisma';
-import { ValorantRole, PREMIER_DIVISIONS, TeamInput, ValidationError } from '../types';
+import { ValorantRole, PREMIER_DIVISIONS, PremierDivision, TeamInput, ValidationError } from '../types';
 import { isValidAvailabilityHours } from './player.service';
 import { isValidUuid } from '../utils/validation';
 
@@ -284,6 +284,74 @@ export async function disbandTeam(
 
   await prisma.team.delete({ where: { id: teamId } });
   return { success: true };
+}
+
+export interface TeamSearchQuery {
+  division?: string;
+  role?: string;
+  recruiting?: string;
+  page?: string;
+  limit?: string;
+}
+
+/**
+ * Searches and lists teams (public directory for players looking for teams).
+ */
+export async function searchTeams(query: TeamSearchQuery) {
+  const page = Math.max(1, parseInt(query.page ?? '1', 10) || 1);
+  const limit = Math.min(50, Math.max(1, parseInt(query.limit ?? '20', 10) || 20));
+  const skip = (page - 1) * limit;
+
+  const where: any = {};
+
+  // By default show recruiting teams unless explicitly requesting all
+  if (query.recruiting !== 'all') {
+    where.isActivelyRecruiting = query.recruiting === 'false' ? false : true;
+  }
+
+  if (query.division && PREMIER_DIVISIONS.includes(query.division as PremierDivision)) {
+    where.division = query.division as PremierDivision;
+  }
+
+  if (query.role && (VALID_ROLES as readonly string[]).includes(query.role)) {
+    where.recruitingRoles = { has: query.role };
+  }
+
+  const [total, teams] = await Promise.all([
+    prisma.team.count({ where }),
+    prisma.team.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: { updatedAt: 'desc' },
+      select: {
+        ...teamSelectFields,
+        captain: {
+          select: {
+            id: true,
+            discordUsername: true,
+            discordAvatar: true,
+            riotId: true,
+            isVerified: true,
+            trustScore: true,
+          },
+        },
+        applications: {
+          where: { status: 'Accepted' },
+          select: {
+            player: { select: rosterMemberSelect },
+          },
+        },
+      },
+    }),
+  ]);
+
+  const data = teams.map(({ applications, ...teamData }) => ({
+    ...teamData,
+    roster: applications.map((a) => a.player),
+  }));
+
+  return { data, total, page, limit };
 }
 
 // ─── Shared select fields ─────────────────────────────────────────────────────

@@ -57,8 +57,8 @@ export function DialogHeader({ children }: { children: React.ReactNode }) {
   return <div className="mb-4 flex items-start justify-between gap-4">{children}</div>;
 }
 
-export function DialogTitle({ children }: { children: React.ReactNode }) {
-  return <h2 className="text-lg font-semibold text-foreground">{children}</h2>;
+export function DialogTitle({ className, children }: { className?: string; children: React.ReactNode }) {
+  return <h2 className={cn("text-lg font-semibold text-foreground", className)}>{children}</h2>;
 }
 
 export function DialogClose({ onClick }: { onClick: () => void }) {

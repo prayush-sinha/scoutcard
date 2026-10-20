@@ -159,6 +159,14 @@ export interface Team {
   recruitingRoles: ValorantRole[];
   requiredHours: number[];
   isActivelyRecruiting: boolean;
+  captain?: {
+    id: string;
+    discordUsername: string | null;
+    discordAvatar: string | null;
+    riotId: string | null;
+    isVerified: boolean;
+    trustScore: number | null;
+  };
   roster?: TeamRosterMember[];
   applicationStats?: ApplicationStats; // only present on GET /teams/my-team
 }

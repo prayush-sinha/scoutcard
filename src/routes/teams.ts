@@ -8,6 +8,7 @@ import {
   getTeamHandler,
   updateTeamHandler,
   disbandTeamHandler,
+  searchTeamsHandler,
 } from '../controllers/team.controller';
 import { verifyToken, optionalToken } from '../middleware/auth';
 
@@ -27,6 +28,13 @@ const router = Router();
  * }
  */
 router.post('/', verifyToken, createTeamHandler);
+
+/**
+ * GET /api/v1/teams
+ * Public team directory — players search actively recruiting teams.
+ * Query: ?division=&role=&recruiting=&page=&limit=
+ */
+router.get('/', optionalToken, searchTeamsHandler);
 
 /**
  * GET /api/v1/teams/my-team

@@ -97,6 +97,14 @@ describe('API Integration Tests', () => {
   });
 
   describe('Team Endpoints', () => {
+    it('GET /api/v1/teams returns 200 with data and meta', async () => {
+      const res = await request(app).get('/api/v1/teams');
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(Array.isArray(res.body.data)).toBe(true);
+      expect(res.body.meta).toBeDefined();
+    });
+
     it('GET /api/v1/teams/:id returns 404 for invalid UUID format', async () => {
       const res = await request(app).get('/api/v1/teams/invalid-uuid');
       expect(res.status).toBe(404);

@@ -1,4 +1,4 @@
-import { Search, Contact, ListChecks, Users, KanbanSquare, type LucideIcon } from "lucide-react";
+import { Search, Contact, ListChecks, Users, KanbanSquare, Shield, type LucideIcon } from "lucide-react";
 
 export interface NavItem {
   href: string;
@@ -17,6 +17,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "Player",
     items: [
       { href: "/scout-card/edit", label: "My Scout Card", short: "Card", icon: Contact },
+      { href: "/teams", label: "Find Teams", short: "Teams", icon: Users },
       { href: "/my-applications", label: "My Applications", short: "Applied", icon: ListChecks },
     ],
   },
@@ -25,7 +26,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/players", label: "LFG Board", short: "Players", icon: Search },
       { href: "/team/applications", label: "Applications Board", short: "Board", icon: KanbanSquare },
-      { href: "/team/settings", label: "Team Settings", short: "Team", icon: Users },
+      { href: "/team/settings", label: "Team Settings", short: "Team", icon: Shield },
     ],
   },
 ];

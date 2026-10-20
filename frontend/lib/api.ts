@@ -5,11 +5,13 @@ import type {
   AuthenticatedPlayer,
   LiveNotification,
   PlayerSearchFilters,
+  PremierDivision,
   ScoutCard,
   ScoutCardPayload,
   Team,
   TeamPayload,
   TrustScoreResult,
+  ValorantRole,
   VerificationStatus,
   PlayerTrackerStats,
 } from "./types";
@@ -118,6 +120,15 @@ export const playerApi = {
 // ---- Teams ----
 export const teamApi = {
   create: (payload: TeamPayload) => api.post<Envelope<Team>>("/teams", payload).then(unwrap),
+  /** Search recruiting teams directory */
+  search: (filters?: { division?: PremierDivision; role?: ValorantRole; page?: number; limit?: number }) => {
+    const params: Record<string, string> = {};
+    if (filters?.division) params.division = filters.division;
+    if (filters?.role) params.role = filters.role;
+    if (filters?.page) params.page = String(filters.page);
+    if (filters?.limit) params.limit = String(filters.limit);
+    return api.get<Paginated<Team>>("/teams", { params }).then(unwrapList);
+  },
   /** Includes `applicationStats` (per-status counts) and `roster` — only on this endpoint. */
   myTeam: () => api.get<Envelope<Team>>("/teams/my-team").then(unwrap),
   getById: (id: string) => api.get<Envelope<Team>>(`/teams/${id}`).then(unwrap),
