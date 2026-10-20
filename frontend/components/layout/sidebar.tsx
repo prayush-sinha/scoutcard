@@ -3,21 +3,13 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Search, Contact, ListChecks, Users, KanbanSquare, LogOut } from "lucide-react";
+import { LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { authApi } from "@/lib/api";
 import { ScoutCardSidebarMark } from "@/components/logo";
 
 import type { AuthenticatedPlayer } from "@/lib/types";
-
-const NAV_ITEMS = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/players", label: "LFG Board", icon: Search },
-  { href: "/scout-card/edit", label: "Scout Card", icon: Contact },
-  { href: "/my-applications", label: "My Applications", icon: ListChecks },
-  { href: "/team/settings", label: "Team", icon: Users },
-  { href: "/team/applications", label: "Applications Board", icon: KanbanSquare },
-];
+import { NAV_GROUPS, isActive } from "./nav-items";
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -39,31 +31,35 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-30 flex w-64 flex-col border-r border-border bg-card">
+    <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-border bg-card lg:flex">
       <div className="flex h-16 items-center border-b border-border px-4">
         <ScoutCardSidebarMark />
       </div>
 
-      <nav className="flex-1 overflow-y-auto scroll-thin px-2 py-4">
-        {NAV_ITEMS.map((item) => {
-          const active = pathname === item.href || (item.href !== "/" && pathname?.startsWith(item.href));
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "mb-1 flex items-center gap-3 border-l-2 px-3 py-2.5 text-sm font-medium transition-colors",
-                active
-                  ? "border-primary bg-primary/10 text-foreground"
-                  : "border-transparent text-foreground-muted hover:border-border hover:bg-muted hover:text-foreground"
-              )}
-            >
-              <Icon size={16} className={active ? "text-primary" : undefined} />
-              {item.label}
-            </Link>
-          );
-        })}
+      <nav className="flex-1 overflow-y-auto scroll-thin px-3 py-5" aria-label="Main">
+        {NAV_GROUPS.map((group) => (
+          <div key={group.label} className="mb-6">
+            <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-[0.14em] text-foreground-muted">{group.label}</p>
+            {group.items.map((item) => {
+              const active = isActive(pathname, item.href);
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  aria-current={active ? "page" : undefined}
+                  className={cn(
+                    "mb-0.5 flex items-center gap-3 rounded-sm px-3 py-2.5 text-sm font-medium transition-colors",
+                    active ? "bg-muted text-foreground" : "text-foreground-muted hover:bg-muted/60 hover:text-foreground"
+                  )}
+                >
+                  <Icon size={17} className={active ? "text-primary" : undefined} />
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
+        ))}
       </nav>
 
       {/* ── User identity panel ── */}
@@ -86,16 +82,16 @@ export function Sidebar() {
           )}
           {/* Name */}
           <div className="min-w-0 flex-1">
-            <p className="truncate text-[12px] font-semibold text-foreground">
+            <p className="truncate text-sm font-semibold text-foreground">
               {me?.discordUsername ?? "Loading…"}
             </p>
-            <p className="text-[10px] text-foreground-muted">Discord account</p>
+            <p className="text-xs text-foreground-muted">Discord account</p>
           </div>
         </div>
 
         <button
           onClick={logout}
-          className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-[11px] font-medium text-foreground-muted transition-colors hover:bg-danger/10 hover:text-danger"
+          className="flex w-full items-center gap-2 rounded-sm px-2 py-2 text-[13px] font-medium text-foreground-muted transition-colors hover:bg-danger/10 hover:text-danger"
         >
           <LogOut size={13} /> Sign out
         </button>
